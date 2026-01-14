@@ -1,0 +1,54 @@
+name: Omerta
+publish_to: "none"
+description: Flutter Mafia/Werewolf game with offline P2P and solo bots
+version: 0.1.0
+
+environment:
+  sdk: ">=2.17.0 <4.0.0"
+  flutter: ">=3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.0.5
+  # Using standard sockets for LAN multiplayer (no external plugins needed)
+  qr_flutter: ^4.0.0
+  mobile_scanner: ^5.0.0
+  share_plus: ^10.0.0
+  path_provider: ^2.0.0
+  barcode_widget: ^2.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  flutter_launcher_icons: 0.14.4
+  flutter_native_splash: ^2.2.20
+
+# Native splash configuration
+flutter_native_splash:
+  color: "#0A0A0A"
+  image: assets/images/icon.png
+  android: true
+  ios: true
+  web: false
+  android_gravity: center
+  ios_content_mode: center
+  android_12:
+    color: "#0A0A0A"
+    image: assets/images/icon.png
+
+# Configuration for flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#0A0A0A"
+  adaptive_icon_foreground: "assets/images/icon.png"
+  remove_alpha_ios: true
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/

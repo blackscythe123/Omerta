@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Mafia LAN - Home</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:ital,wght@0,100..900;1,100..900&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1a4251", // Deep Teal
+                        "primary-light": "#2a6275", 
+                        "background-light": "#f3f2f2",
+                        "background-dark": "#191d1f",
+                        "accent-gold": "#D4AF37", // Muted Gold for Noir accents
+                        "surface-dark": "#23282b",
+                    },
+                    fontFamily: {
+                        "display": ["Epilogue", "sans-serif"]
+                    },
+                    backgroundImage: {
+                        'smoke-gradient': 'radial-gradient(circle at 50% 30%, rgba(38, 59, 66, 0.4) 0%, rgba(25, 29, 31, 0) 70%)',
+                        'vignette': 'linear-gradient(to bottom, rgba(25, 29, 31, 0.2) 0%, rgba(25, 29, 31, 1) 90%)'
+                    }
+                },
+            },
+        }
+    </script>
+<style>/* Custom noise texture overlay */
+.noise-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0.05;
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuDn7OKGmysYLnl-RoHlTyP4FDte2hbvatShzgO8AvE9YkZkTtTZYupeQUgPsjldDMW0whS728QlZfGpCuQdf0wwO0PkvZQwfn4OaEOxGRUxzI3DwFdXnOMsgCvWoI_K_648c8h4y_ZCngZCSfs5ob1IUlcOIytFKSk2NYRaAXyqmvSGTIEuq4LLqN7xThqipCRilTMXv5Fho70WxRCJAJYs6hdnMsTbjkkUflGi0phj8ifNfJi3wcU58Quq-N84n1f5lPa8yqJshjI)
+    }
+.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24
+    }
+.material-symbols-outlined.active-icon {
+    font-variation-settings: "FILL" 1, "wght" 500
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display antialiased text-white selection:bg-accent-gold selection:text-black h-full overflow-hidden">
+<!-- Screen Container -->
+<div class="relative flex h-full min-h-screen w-full flex-col overflow-hidden bg-background-dark">
+<!-- Atmospheric Background Layers -->
+<div class="absolute inset-0 bg-smoke-gradient opacity-60 z-0 pointer-events-none"></div>
+<div class="noise-overlay"></div>
+<!-- Main Content Scroll Area -->
+<div class="flex-1 flex flex-col z-10 relative overflow-y-auto pb-24">
+<!-- Status Bar -->
+<div class="w-full px-6 pt-12 pb-4 flex justify-end items-center">
+<div class="flex items-center gap-2 px-3 py-1 rounded-full bg-surface-dark/80 border border-white/10 backdrop-blur-sm shadow-lg">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+</span>
+<span class="text-[10px] font-bold tracking-widest text-emerald-500 uppercase">LAN Ready</span>
+</div>
+</div>
+<!-- Hero Section -->
+<div class="flex flex-col items-center justify-center mt-4 px-6">
+<!-- Abstract Noir Image/Graphic -->
+<div class="relative w-full aspect-square max-h-[320px] mb-[-40px] flex items-center justify-center">
+<div class="absolute inset-0 bg-center bg-contain bg-no-repeat opacity-80 mix-blend-overlay" data-alt="Abstract coffee smoke swirls against a dark background resembling noir mystery" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAVzFsqh3D-ZUstCAEjr11-tk5x3XJ0KImxFbNBcrWJ1r2v8OjmbfKgy_IU-trBK8qZtcF8GyPKUDwnL1vDdf-TgoNBF92ICEQ-4qf7BRLZJCzmAC00gWVlgRscUCkpgLj90jX7m4evopa_3o-oi5unFvegWIC4d7-NoS3xFdJUNnXy_fTAYYmZiqwuS_cpDC_MlnNHh0jqwWD8gd0iuwq0tXrDLcReIA7LBRl8axz2WiKbghNO038awycMI_t2aWh9NDPireDvTlY");'>
+</div>
+<!-- Radial fade for image blending -->
+<div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background-dark"></div>
+</div>
+<!-- Typography -->
+<div class="relative z-10 text-center">
+<h1 class="text-6xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-white via-gray-200 to-gray-500 drop-shadow-2xl mb-2">
+                        MAFIA
+                    </h1>
+<div class="flex items-center justify-center gap-4 mb-6">
+<div class="h-[1px] w-12 bg-accent-gold/50"></div>
+<span class="text-accent-gold text-sm font-bold tracking-[0.3em] uppercase">LAN Edition</span>
+<div class="h-[1px] w-12 bg-accent-gold/50"></div>
+</div>
+<p class="text-gray-400 text-sm font-light italic tracking-wide opacity-80">"Trust No One."</p>
+</div>
+</div>
+<!-- Actions Section -->
+<div class="flex flex-col gap-4 px-8 mt-16 w-full max-w-md mx-auto">
+<!-- Host Game -->
+<button class="group relative flex w-full cursor-pointer items-center justify-between overflow-hidden rounded-lg h-16 pl-6 pr-4 bg-primary hover:bg-primary-light transition-all duration-300 shadow-[0_4px_20px_-5px_rgba(26,66,81,0.5)] border border-white/5">
+<div class="flex flex-col items-start">
+<span class="text-white text-lg font-bold tracking-widest uppercase">Host Game</span>
+<span class="text-white/50 text-[10px] font-medium tracking-wide uppercase group-hover:text-white/80 transition-colors">Create a lobby</span>
+</div>
+<span class="material-symbols-outlined text-accent-gold group-hover:translate-x-1 transition-transform">arrow_forward</span>
+<!-- Subtle shine effect -->
+<div class="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent z-10 skew-x-12"></div>
+</button>
+<!-- Join Game -->
+<button class="group flex w-full cursor-pointer items-center justify-between overflow-hidden rounded-lg h-16 pl-6 pr-4 bg-surface-dark hover:bg-gray-800 border border-white/10 transition-all duration-300">
+<div class="flex flex-col items-start">
+<span class="text-gray-200 text-lg font-bold tracking-widest uppercase">Join Game</span>
+<span class="text-gray-500 text-[10px] font-medium tracking-wide uppercase group-hover:text-gray-400 transition-colors">Enter Room Code</span>
+</div>
+<span class="material-symbols-outlined text-gray-500 group-hover:text-white transition-colors">login</span>
+</button>
+</div>
+<div class="h-8"></div>
+</div>
+<!-- Bottom Navigation Bar -->
+<nav class="absolute bottom-0 w-full z-40">
+<!-- Glassmorphism effect -->
+<div class="absolute inset-0 bg-background-dark/90 backdrop-blur-md border-t border-white/5"></div>
+<div class="relative flex justify-around items-center h-[88px] pb-[24px] px-2">
+<!-- Home (Active) -->
+<button class="flex flex-col items-center justify-center w-20 gap-1 group">
+<div class="relative p-1">
+<span class="material-symbols-outlined text-accent-gold text-3xl active-icon drop-shadow-[0_0_8px_rgba(212,175,55,0.4)]">home_app_logo</span>
+</div>
+<span class="text-[10px] font-bold tracking-wider text-accent-gold uppercase">Home</span>
+</button>
+<!-- Rules -->
+<button class="flex flex-col items-center justify-center w-20 gap-1 group">
+<div class="relative p-1">
+<span class="material-symbols-outlined text-gray-500 text-2xl group-hover:text-gray-300 transition-colors">menu_book</span>
+</div>
+<span class="text-[10px] font-medium tracking-wider text-gray-500 group-hover:text-gray-300 transition-colors uppercase">Rules</span>
+</button>
+<!-- Settings -->
+<button class="flex flex-col items-center justify-center w-20 gap-1 group">
+<div class="relative p-1">
+<span class="material-symbols-outlined text-gray-500 text-2xl group-hover:text-gray-300 transition-colors">settings</span>
+</div>
+<span class="text-[10px] font-medium tracking-wider text-gray-500 group-hover:text-gray-300 transition-colors uppercase">Settings</span>
+</button>
+</div>
+</nav>
+</div>
+</body></html>

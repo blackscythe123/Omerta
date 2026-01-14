@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Mafia Game Lobby</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:ital,wght@0,100..900;1,100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1a4251", // Deep teal
+                        "background-light": "#f3f2f2",
+                        "background-dark": "#191d1f",
+                        "paper-dark": "#23282b",
+                        "gold-accent": "#D4AF37",
+                    },
+                    fontFamily: {
+                        "display": ["Epilogue", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                    backgroundImage: {
+                        'noise': "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+')",
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #191d1f; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2f383d; 
+            border-radius: 4px;
+        }
+        
+        .noir-shadow {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+        
+        .folder-tab {
+            clip-path: polygon(0 0, 40% 0, 45% 100%, 0% 100%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased overflow-hidden">
+<div class="relative flex h-screen w-full flex-col overflow-hidden max-w-md mx-auto shadow-2xl bg-background-light dark:bg-background-dark">
+<!-- Top App Bar -->
+<div class="relative z-10 flex items-center p-4 justify-between bg-background-light dark:bg-background-dark border-b border-gray-300 dark:border-white/10">
+<button class="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-[24px]">arrow_back</span>
+</button>
+<div class="flex gap-2">
+<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse mt-2"></div>
+<h2 class="text-sm font-bold tracking-[0.2em] uppercase text-slate-500 dark:text-slate-400">Online</h2>
+</div>
+<button class="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-red-500/80">
+<span class="material-symbols-outlined text-[24px]">logout</span>
+</button>
+</div>
+<!-- Scrollable Content Area -->
+<div class="flex-1 overflow-y-auto pb-32 relative">
+<!-- Briefing Header -->
+<div class="pt-8 pb-6 px-6 text-center">
+<p class="text-primary dark:text-[#a2afb3] text-xs font-bold tracking-[0.3em] uppercase mb-2 opacity-70">Classified Briefing</p>
+<div class="inline-flex items-center justify-center gap-3 border-y-2 border-slate-300 dark:border-white/10 py-2 px-6 mb-4 bg-white/50 dark:bg-white/5">
+<h1 class="text-4xl font-black tracking-tight text-primary dark:text-white">ROOM: X9J2</h1>
+<button class="text-slate-400 hover:text-primary dark:hover:text-white transition-colors">
+<span class="material-symbols-outlined text-[20px]">content_copy</span>
+</button>
+</div>
+<p class="text-slate-600 dark:text-slate-400 text-sm font-medium flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">group</span>
+                    5 / 10 Agents Assembled
+                </p>
+</div>
+<!-- Players Grid -->
+<div class="px-4">
+<div class="grid grid-cols-2 gap-3">
+<!-- Player 1 (Host) -->
+<div class="relative group flex flex-col gap-3 rounded-lg border border-slate-300 dark:border-[#404b4f] bg-white dark:bg-[#1e2324] p-3 items-center shadow-sm">
+<div class="absolute -top-2 -right-2 bg-gold-accent text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 z-10">
+<span class="material-symbols-outlined text-[12px]">local_police</span> HOST
+                        </div>
+<div class="relative w-16 h-16 shrink-0">
+<div class="absolute inset-0 rounded-full border-2 border-primary/20 dark:border-white/20"></div>
+<div class="bg-center bg-no-repeat bg-cover rounded-full w-full h-full grayscale contrast-125" data-alt="Silhouette of a man in a fedora hat smoking in the dark" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuChb01QDfRCyB7NxVE6cE9SemmnGh1Df9NiF6-PAoEUKy5PUc4FN0r0Cpa7-6YYPWSPC41RSehSNKZrt9OX8vLsMFeDT3VPBKdWD9-jK8GWE0AER0tjiJQ0YLyisl8gbLZsm-TGbsiODDzawkdG_AnnEWElcjP9HhUmMU4Dytf7Vo1rhl76aGfNvJ-Dyy4oKsBdwNYXISGH1ADoL5tw1f9m0KwtvZGehBwivQzG13LgBgpOcsazklOik-qOjiREuonPfIRDIR6IeVY");'></div>
+</div>
+<div class="text-center w-full">
+<h2 class="text-slate-900 dark:text-white text-sm font-bold leading-tight truncate">Don Sal</h2>
+<p class="text-[10px] text-primary dark:text-slate-400 uppercase tracking-wide mt-1 font-bold">Ready</p>
+</div>
+</div>
+<!-- Player 2 -->
+<div class="relative flex flex-col gap-3 rounded-lg border border-slate-300 dark:border-[#404b4f] bg-white dark:bg-[#1e2324] p-3 items-center shadow-sm opacity-90">
+<div class="relative w-16 h-16 shrink-0">
+<div class="bg-center bg-no-repeat bg-cover rounded-full w-full h-full grayscale contrast-125" data-alt="Mysterious woman looking sideways with dramatic lighting" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAOI3Qmg2HXfgkiZqTT5vv0ihQWU2uCSJWogvxBWVf65_7q8vV5PtNRr0cJOF6ZGTTGuGEFcXUHz4atMNGF26PImEUnXAosHeLJ0R3RAsAs4n4wU1YyDRYkuzi79BJZkM7C3Ac_ySMiuE0CxEWFGD2jormipYj1_sSS4svCGCbOyfBo1AzbbfFGiDQrtQYJLaPNJZyhDCeNnDpulRRKqpHolbaCBiKVZHMCPvA698lraiOJ13dF3wiwLvgrXtOzptEXr4uQuLP5S8s");'></div>
+</div>
+<div class="text-center w-full">
+<h2 class="text-slate-900 dark:text-white text-sm font-bold leading-tight truncate">The Snitch</h2>
+<p class="text-[10px] text-slate-500 dark:text-slate-500 uppercase tracking-wide mt-1">Waiting...</p>
+</div>
+</div>
+<!-- Player 3 -->
+<div class="relative flex flex-col gap-3 rounded-lg border border-slate-300 dark:border-[#404b4f] bg-white dark:bg-[#1e2324] p-3 items-center shadow-sm opacity-90">
+<div class="relative w-16 h-16 shrink-0">
+<div class="bg-center bg-no-repeat bg-cover rounded-full w-full h-full grayscale contrast-125" data-alt="Close up of an intense eye looking through blinds" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCsE3tnoFKOnkL-m5Ags3lP1a-3ITokiZHpTp1lj-XP6XMf-wvvIRhvxMeNm_N8kMU7uKSai3FsRUWs2y2YeGnjt8HG1jni2rKEPQPyO7JPly3zXbg8I_Wy1gcWjyR59CjUOJu7uP4q6Sr6R1WOcIMNxFCrwPMgwY9uAv1Uob1TzvVQDi7HjFc4-RJ7eLectVGT-Mt-JLxAAonuw_pzBiGFknPbip8tF9Tamapf4Nr1drAFqJxPlogGfGcgSTAEsowYjvpDuFZzQq0");'></div>
+</div>
+<div class="text-center w-full">
+<h2 class="text-slate-900 dark:text-white text-sm font-bold leading-tight truncate">Agent 47</h2>
+<p class="text-[10px] text-slate-500 dark:text-slate-500 uppercase tracking-wide mt-1">Waiting...</p>
+</div>
+</div>
+<!-- Player 4 -->
+<div class="relative flex flex-col gap-3 rounded-lg border border-slate-300 dark:border-[#404b4f] bg-white dark:bg-[#1e2324] p-3 items-center shadow-sm opacity-90">
+<div class="relative w-16 h-16 shrink-0">
+<div class="bg-center bg-no-repeat bg-cover rounded-full w-full h-full grayscale contrast-125" data-alt="Shadowy figure in a trench coat standing in rain" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuD7tn2UW1iAIbSpsF8EcnnBz33H0LNZq1ApIRbyWfUN5zrLhpkBt5VYAin-qyJHEc6Qeqfgr31cw4eaZIU4MRKZz0D6E2iqj6ILE3YsOVHzCDcdsG9z6fnplBsYb1dSgT4TrvXKTBmfmMPIfpUpTvdRLnayYjixLzknkbeIA-pb5VGIuA6TZowBEPpt5FFgxSXZrcgt8BNFLvgGo8G9jJ_d5UMNipxUtm3ZIA8P13ShPQ2yz1pDCsa2IhpflbuSMKL7iciHUN9QqSw");'></div>
+</div>
+<div class="text-center w-full">
+<h2 class="text-slate-900 dark:text-white text-sm font-bold leading-tight truncate">Mob Wife</h2>
+<p class="text-[10px] text-primary dark:text-slate-400 uppercase tracking-wide mt-1 font-bold">Ready</p>
+</div>
+</div>
+<!-- Player 5 -->
+<div class="relative flex flex-col gap-3 rounded-lg border border-slate-300 dark:border-[#404b4f] bg-white dark:bg-[#1e2324] p-3 items-center shadow-sm opacity-90">
+<div class="relative w-16 h-16 shrink-0">
+<div class="bg-center bg-no-repeat bg-cover rounded-full w-full h-full grayscale contrast-125" data-alt="Abstract noir smoke texture" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAckjEotLfosk-96b4NV4D2NCI3WQdsfDV0DmTAf4uu3iNXpsmMLrk4XOZj-oQp0D0V4ZnwyGpZGX4-ciymbjK3K4TFr1AWBbXxq7Zkr05h64Mf1FyYViYoNUWvwDAdLZZIoXNQ2L6qT-NRCC5mITH7kgn0A3WYHH89ArCelBgXrJt6WeU0i6l0fn7ujv1FDGOt6tVXwXy6cpeTa947D2Pe7j4-t7cY6lmnlg5Y4uAo_uqpayW7nLUYzNRSt-JmCZ4J9RmogkWvqkw");'></div>
+</div>
+<div class="text-center w-full">
+<h2 class="text-slate-900 dark:text-white text-sm font-bold leading-tight truncate">Tommy Guns</h2>
+<p class="text-[10px] text-slate-500 dark:text-slate-500 uppercase tracking-wide mt-1">Waiting...</p>
+</div>
+</div>
+<!-- Empty Slot -->
+<div class="flex flex-col gap-3 rounded-lg border-2 border-dashed border-slate-300 dark:border-[#404b4f] bg-transparent p-3 items-center justify-center opacity-50 min-h-[140px]">
+<div class="w-12 h-12 rounded-full bg-slate-200 dark:bg-white/5 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-400">add</span>
+</div>
+<h2 class="text-slate-400 text-xs font-bold leading-tight">Empty Seat</h2>
+</div>
+<!-- Empty Slot -->
+<div class="flex flex-col gap-3 rounded-lg border-2 border-dashed border-slate-300 dark:border-[#404b4f] bg-transparent p-3 items-center justify-center opacity-50 min-h-[140px]">
+<div class="w-12 h-12 rounded-full bg-slate-200 dark:bg-white/5 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-400">add</span>
+</div>
+<h2 class="text-slate-400 text-xs font-bold leading-tight">Empty Seat</h2>
+</div>
+</div>
+</div>
+</div>
+<!-- Host Controls (Fixed Bottom) -->
+<div class="absolute bottom-0 left-0 w-full z-20">
+<!-- Gradient fade up -->
+<div class="h-8 w-full bg-gradient-to-t from-background-light dark:from-background-dark to-transparent pointer-events-none"></div>
+<div class="bg-background-light dark:bg-[#121516] border-t-4 border-slate-300 dark:border-[#2f383d] p-5 pb-8 noir-shadow rounded-t-xl">
+<!-- Quick Settings Preview -->
+<div class="flex justify-between items-center mb-4 px-1">
+<div class="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400">
+<span class="material-symbols-outlined text-[16px]">timer</span>
+<span>7 Min</span>
+<span class="mx-1 opacity-50">•</span>
+<span class="material-symbols-outlined text-[16px]">theater_comedy</span>
+<span>2 Mafia</span>
+</div>
+<button class="text-xs font-bold text-primary dark:text-white uppercase tracking-wider border-b border-primary/50 dark:border-white/50 hover:text-primary/80 dark:hover:text-white/80 transition-colors">
+                        Configure
+                    </button>
+</div>
+<!-- Action Buttons -->
+<div class="flex gap-3">
+<button class="flex-1 bg-slate-200 dark:bg-[#2a3033] text-slate-700 dark:text-white p-4 rounded-lg font-bold text-sm tracking-wide hover:bg-slate-300 dark:hover:bg-[#353d41] transition-colors border border-slate-300 dark:border-transparent flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+                        SETTINGS
+                    </button>
+<button class="flex-[2] bg-primary text-white p-4 rounded-lg font-bold text-sm tracking-[0.05em] shadow-lg hover:bg-primary/90 transition-all active:scale-[0.98] flex items-center justify-center gap-2 border border-white/10 relative overflow-hidden group">
+<!-- Shine effect -->
+<div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1s_infinite]"></div>
+                        INITIATE OPERATION
+                        <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+</div>
+<div class="text-center mt-3">
+<p class="text-[10px] text-slate-400 dark:text-slate-600">Waiting for players to ready up...</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Animation definition -->
+<style>
+        @keyframes shimmer {
+            100% {
+                transform: translateX(100%);
+            }
+        }
+    </style>
+</body></html>

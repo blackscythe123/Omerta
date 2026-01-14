@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Room Discovery - Mafia LAN</title>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:ital,wght@0,100..900;1,100..900&amp;family=Noto+Sans:ital,wght@0,100..900;1,100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1a4251", // Deep Teal
+                        "accent-gold": "#D4AF37", // Muted Brassy Gold
+                        "accent-red": "#A01A24", // Deep Crimson
+                        "surface-dark": "#29383E", // Slate Blue for cards
+                        "background-light": "#f3f2f2",
+                        "background-dark": "#191d1f", // Deepest Teal/Black
+                    },
+                    fontFamily: {
+                        "display": ["Epilogue", "sans-serif"],
+                        "body": ["Noto Sans", "sans-serif"],
+                    },
+                    backgroundImage: {
+                        'noise': "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22 opacity=%220.05%22/%3E%3C/svg%3E')",
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #191d1f; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #29383E; 
+            border-radius: 2px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-white overflow-hidden antialiased selection:bg-accent-gold selection:text-black">
+<div class="relative flex h-screen w-full flex-col max-w-md mx-auto shadow-2xl overflow-hidden bg-background-dark">
+<!-- Background Noise Texture -->
+<div class="absolute inset-0 pointer-events-none z-0 bg-noise opacity-30 mix-blend-overlay"></div>
+<!-- Header -->
+<header class="relative z-10 flex items-center justify-between p-5 bg-background-dark border-b border-white/5">
+<button class="flex items-center justify-center size-10 rounded-full hover:bg-white/5 transition-colors text-white/70">
+<span class="material-symbols-outlined text-[24px]">arrow_back</span>
+</button>
+<h1 class="text-lg font-bold tracking-widest uppercase text-white/90">Decrypting Signals</h1>
+<button class="flex items-center justify-center size-10 rounded-full hover:bg-white/5 transition-colors text-accent-gold">
+<span class="material-symbols-outlined text-[24px]">help</span>
+</button>
+</header>
+<!-- Scanner Visual -->
+<div class="relative z-10 px-6 pt-6 pb-2 bg-background-dark">
+<div class="flex items-center justify-between mb-2">
+<span class="text-accent-gold text-xs font-bold tracking-[0.2em] uppercase animate-pulse">Intercepting...</span>
+<span class="text-white/40 text-xs font-mono">FREQ: 104.5 MHz</span>
+</div>
+<!-- Static Waveform Visual -->
+<div class="flex items-end justify-between h-12 gap-1 w-full opacity-80">
+<div class="w-1 bg-primary/40 h-[40%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/60 h-[70%] rounded-t-sm"></div>
+<div class="w-1 bg-accent-gold h-[100%] rounded-t-sm shadow-[0_0_10px_rgba(212,175,55,0.5)]"></div>
+<div class="w-1 bg-primary/60 h-[60%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/40 h-[30%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/20 h-[50%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/40 h-[80%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/60 h-[40%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/20 h-[20%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/30 h-[45%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/50 h-[75%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/20 h-[30%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/40 h-[60%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/30 h-[35%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/20 h-[50%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/50 h-[80%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/30 h-[40%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/40 h-[65%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/20 h-[25%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/10 h-[45%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/30 h-[20%] rounded-t-sm"></div>
+<div class="w-1 bg-primary/10 h-[10%] rounded-t-sm"></div>
+</div>
+<div class="w-full h-px bg-gradient-to-r from-transparent via-accent-gold/50 to-transparent mt-[-1px]"></div>
+</div>
+<!-- Room List -->
+<main class="relative z-10 flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-24">
+<!-- Card 1: Active/Ideal -->
+<div class="group relative overflow-hidden rounded bg-surface-dark p-4 shadow-lg border border-white/5 hover:border-accent-gold/30 transition-all duration-300">
+<div class="flex items-start justify-between">
+<div class="flex flex-col gap-1 w-full">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-accent-gold text-[18px]">radio</span>
+<h3 class="text-white font-bold text-lg tracking-wider uppercase leading-none">The Don's Lounge</h3>
+</div>
+<div class="flex items-center gap-4 mt-2">
+<div class="flex items-center gap-1.5 text-xs text-white/60 font-mono bg-black/20 px-2 py-1 rounded">
+<span class="material-symbols-outlined text-[14px]">group</span>
+<span>5/12 Operatives</span>
+</div>
+<div class="flex items-center gap-1.5 text-xs text-emerald-400 font-mono bg-black/20 px-2 py-1 rounded">
+<span class="material-symbols-outlined text-[14px]">signal_cellular_alt</span>
+<span>12ms</span>
+</div>
+</div>
+<!-- Player Progress Bar -->
+<div class="w-full h-1 bg-black/40 rounded-full mt-3 overflow-hidden">
+<div class="h-full bg-emerald-500 w-[41%]"></div>
+</div>
+</div>
+<button class="ml-4 flex h-10 w-12 shrink-0 items-center justify-center rounded bg-white/10 text-white hover:bg-accent-gold hover:text-black transition-colors">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Card 2: High Ping/Warning -->
+<div class="group relative overflow-hidden rounded bg-surface-dark p-4 shadow-lg border border-white/5 hover:border-accent-gold/30 transition-all duration-300">
+<div class="flex items-start justify-between">
+<div class="flex flex-col gap-1 w-full">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-white/40 text-[18px]">meeting_room</span>
+<h3 class="text-white font-bold text-lg tracking-wider uppercase leading-none">Safehouse #404</h3>
+</div>
+<div class="flex items-center gap-4 mt-2">
+<div class="flex items-center gap-1.5 text-xs text-white/60 font-mono bg-black/20 px-2 py-1 rounded">
+<span class="material-symbols-outlined text-[14px]">group</span>
+<span>8/10 Operatives</span>
+</div>
+<div class="flex items-center gap-1.5 text-xs text-accent-red font-mono bg-black/20 px-2 py-1 rounded">
+<span class="material-symbols-outlined text-[14px]">signal_cellular_nodata</span>
+<span>184ms</span>
+</div>
+</div>
+<div class="w-full h-1 bg-black/40 rounded-full mt-3 overflow-hidden">
+<div class="h-full bg-accent-gold w-[80%]"></div>
+</div>
+</div>
+<button class="ml-4 flex h-10 w-12 shrink-0 items-center justify-center rounded bg-white/10 text-white hover:bg-accent-gold hover:text-black transition-colors">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Card 3: Full/Locked -->
+<div class="group relative overflow-hidden rounded bg-surface-dark/60 p-4 border border-white/5 opacity-80">
+<div class="flex items-start justify-between">
+<div class="flex flex-col gap-1 w-full">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-white/20 text-[18px]">lock</span>
+<h3 class="text-white/50 font-bold text-lg tracking-wider uppercase leading-none">Speakeasy VIP</h3>
+</div>
+<div class="flex items-center gap-4 mt-2">
+<div class="flex items-center gap-1.5 text-xs text-white/40 font-mono bg-black/20 px-2 py-1 rounded">
+<span class="material-symbols-outlined text-[14px]">group</span>
+<span>12/12 Full</span>
+</div>
+<div class="flex items-center gap-1.5 text-xs text-white/40 font-mono bg-black/20 px-2 py-1 rounded">
+<span class="material-symbols-outlined text-[14px]">signal_cellular_alt</span>
+<span>45ms</span>
+</div>
+</div>
+<div class="w-full h-1 bg-black/40 rounded-full mt-3 overflow-hidden">
+<div class="h-full bg-white/20 w-full"></div>
+</div>
+</div>
+<button class="ml-4 flex h-10 w-12 shrink-0 items-center justify-center rounded bg-white/5 text-white/20 cursor-not-allowed" disabled="">
+<span class="material-symbols-outlined">lock</span>
+</button>
+</div>
+</div>
+<!-- Empty State Illustration Placeholder (if needed, but using list here) -->
+<div class="flex flex-col items-center justify-center py-8 opacity-40">
+<span class="material-symbols-outlined text-4xl mb-2 text-white/20">radar</span>
+<p class="text-xs uppercase tracking-widest text-white/30">End of transmission</p>
+</div>
+</main>
+<!-- Footer Actions -->
+<div class="absolute bottom-0 left-0 right-0 z-20 p-5 bg-background-dark/95 backdrop-blur border-t border-white/5">
+<div class="flex gap-3">
+<button class="flex-1 group relative flex items-center justify-center gap-2 h-14 bg-primary text-white rounded overflow-hidden shadow-lg shadow-primary/20 hover:bg-primary/90 hover:shadow-primary/30 transition-all">
+<!-- Subtle gradient overlay -->
+<div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+<span class="relative material-symbols-outlined">add_circle</span>
+<span class="relative font-bold tracking-wider uppercase text-sm">Establish HQ</span>
+</button>
+<button class="w-14 shrink-0 flex items-center justify-center h-14 border border-white/10 rounded text-accent-gold hover:bg-white/5 hover:border-accent-gold/30 transition-all">
+<span class="material-symbols-outlined text-[24px]">refresh</span>
+</button>
+</div>
+</div>
+</div>
+</body></html>

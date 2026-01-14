@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Mafia Game Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@300;400;600;700;800&amp;family=Noto+Sans:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1a4251", // Keeping config primary
+                        "primary-teal": "#1A4350", // Plan primary
+                        "background-light": "#f3f2f2",
+                        "background-dark": "#191d1f",
+                        "noir-bg": "#1A1E20",
+                        "noir-card": "#29383E",
+                        "noir-gold": "#D4AF37",
+                        "noir-crimson": "#A01A24",
+                    },
+                    fontFamily: {
+                        "display": ["Epilogue", "sans-serif"],
+                        "body": ["Noto Sans", "sans-serif"],
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                    backgroundImage: {
+                        'vignette': 'radial-gradient(circle, transparent 50%, rgba(0,0,0,0.8) 100%)',
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar for a clean feel */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1A1E20; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #29383E; 
+            border-radius: 4px;
+        }
+        .text-shadow-sm {
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-black flex justify-center min-h-screen">
+<!-- Mobile Container -->
+<div class="relative flex h-full min-h-screen w-full max-w-md flex-col bg-[#1A1E20] dark group/design-root overflow-hidden border-x border-[#29383E] shadow-2xl font-display">
+<!-- Noir Grain Overlay -->
+<div class="pointer-events-none absolute inset-0 z-0 opacity-[0.03]" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB0oPEDh6wWfxVfO7GGkRoFUwrPyML4-JXRVDe4Y6rze03mXiQ2dNYUUnM73LPIBJTSH9oQwDLJLt3rwvR9xT1LM5GjGcuVl5Yktw1ca_0ZdiVecZQPSFVp_iD7j1V3hMNfY423vz4uRT54IgfLyzbCMTIzS2IeebQEwOwTYzncu64svUHT2RZ6fHnWkowt-B6YN-oTuV497U7RDYNUhhcpZ7W42jZwpfgyiAc6N58fWeBP1Mz6OI7Oza3jZ6FcwCvPrZgiWrFxD2o');"></div>
+<!-- Header -->
+<div class="relative z-10 flex items-center bg-[#1A1E20]/95 backdrop-blur-md p-4 pb-2 justify-between border-b border-[#29383E]">
+<button class="text-white/80 hover:text-white flex size-10 shrink-0 items-center justify-center rounded-lg active:bg-white/10 transition-colors">
+<span class="material-symbols-outlined" style="font-size: 24px;">arrow_back</span>
+</button>
+<h2 class="text-white text-lg font-bold uppercase tracking-[0.15em] flex-1 text-center pr-10">Confidential</h2>
+</div>
+<!-- Custom Segmented Tabs -->
+<div class="relative z-10 px-4 pt-4 pb-2 bg-[#1A1E20]">
+<div class="flex p-1 bg-[#121516] rounded-lg border border-[#29383E]">
+<button class="flex-1 py-2 px-3 rounded text-sm font-bold tracking-wide transition-all bg-[#29383E] text-white shadow-sm border border-[#3e5058]">
+                    Objective
+                </button>
+<button class="flex-1 py-2 px-3 rounded text-sm font-bold tracking-wide transition-all text-[#7a8a91] hover:text-white">
+                    Roles
+                </button>
+<button class="flex-1 py-2 px-3 rounded text-sm font-bold tracking-wide transition-all text-[#7a8a91] hover:text-white">
+                    Flow
+                </button>
+</div>
+</div>
+<!-- Scrollable Content -->
+<div class="relative z-0 flex-1 overflow-y-auto pb-24">
+<!-- Hero Section -->
+<div class="relative w-full h-48 bg-[#121516]">
+<div class="absolute inset-0 bg-cover bg-center opacity-60" data-alt="Abstract noir city skyline at night with rain" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuASiX0Yrm1M8QdQZNFjYIjSngBwgP5VB6hTkQPyGLiJPQE1Kzn7rofvTeZA6q5Gvkl1YjXrhq9y14vhe7tKeouaSoqe6XVyrmHnQh_oXOTRuv44FuP8LUmc3EnlqVN81F08kp2Ise3RNDFWlg0EMb3fbhR4XkK7jPTE7wDE_c8RwjREzpxMfjUEN28-A51B9LopMorta35uZ7bSOyUdUke3i6OyX2ynAO8MnNPZmcowtVWFcRMAlvkQAr_tLjIvg6CBkcLaVzHIrwg');">
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-[#1A1E20] via-[#1A1E20]/50 to-transparent"></div>
+<div class="absolute bottom-4 left-4 right-4">
+<div class="flex items-center gap-2 mb-1">
+<span class="material-symbols-outlined text-noir-gold" style="font-size: 20px;">balance</span>
+<span class="text-noir-gold text-xs font-bold tracking-widest uppercase">Briefing</span>
+</div>
+<h1 class="text-white text-3xl font-extrabold leading-tight tracking-tight drop-shadow-lg">
+                        Winning <br/>Conditions
+                    </h1>
+</div>
+</div>
+<div class="px-4 pt-6 space-y-6">
+<!-- Headline Text -->
+<div class="flex items-center gap-3">
+<div class="h-px bg-[#29383E] flex-1"></div>
+<p class="text-[#7a8a91] text-xs font-bold uppercase tracking-[0.2em]">Top Secret</p>
+<div class="h-px bg-[#29383E] flex-1"></div>
+</div>
+<!-- Mafia Card (The Objective - Antagonist) -->
+<div class="group relative overflow-hidden rounded-lg bg-[#29383E] border border-noir-crimson/30 shadow-[0_4px_20px_rgba(0,0,0,0.3)] transition-transform hover:scale-[1.02]">
+<div class="absolute top-0 right-0 p-3 opacity-20 group-hover:opacity-40 transition-opacity">
+<span class="material-symbols-outlined text-noir-crimson" style="font-size: 64px;">local_police</span>
+</div>
+<div class="flex flex-col sm:flex-row">
+<div class="w-full sm:w-32 bg-cover bg-center h-32 sm:h-auto border-b sm:border-b-0 sm:border-r border-noir-crimson/20" data-alt="Silhouette of a person in a fedora smoking in the shadows" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDS0Pvn8E3RyClYwymYGysCOW4yk1dwQSr4llLWjjKIlLrgmIvOZVSd7nPb43fCprs0gXQPGwE6FjCPkq6Ih6AEq-eUNLsL6tv8Ny-gs1dcBkAR7eK6P3a2DnSnz2EJu1bdqiJsikR_uQmAS6-eSHVb_YwqCxQSlKXjlE3FpG9oRuDdGgjEsAdgysGX9my5V9DPEWmzVMjPgXInnSiKSgJ0czg6_AJaM8OqSA5Zb2R0NDia3ASrHzTXxptRU7CRkYWoYZaS6IgJvu8');">
+<div class="w-full h-full bg-noir-crimson/10 mix-blend-overlay"></div>
+</div>
+<div class="flex-1 p-4 flex flex-col justify-center relative">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-white text-xl font-bold tracking-wide">The Mafia</h3>
+<span class="bg-noir-crimson/20 text-noir-crimson text-[10px] font-bold px-2 py-1 rounded border border-noir-crimson/30 uppercase tracking-wider">Antagonist</span>
+</div>
+<p class="text-[#a2afb3] text-sm leading-relaxed border-l-2 border-noir-crimson/50 pl-3">
+                                Eliminate all innocents before being caught. Deceive the town during the day.
+                            </p>
+</div>
+</div>
+</div>
+<!-- Town Card (The Objective - Protagonist) -->
+<div class="group relative overflow-hidden rounded-lg bg-[#29383E] border border-noir-gold/30 shadow-[0_4px_20px_rgba(0,0,0,0.3)] transition-transform hover:scale-[1.02]">
+<div class="absolute top-0 right-0 p-3 opacity-20 group-hover:opacity-40 transition-opacity">
+<span class="material-symbols-outlined text-noir-gold" style="font-size: 64px;">groups</span>
+</div>
+<div class="flex flex-col sm:flex-row">
+<div class="w-full sm:w-32 bg-cover bg-center h-32 sm:h-auto border-b sm:border-b-0 sm:border-r border-noir-gold/20" data-alt="Group of concerned citizens talking in a dim room" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAQfhCzVlQxE1iw2EOVUGb1Ca0ud_sk44Cw8aGjPY6B4lCm56H7D5CUlbu7BcmRzeU9MOxWQxvw5OYy_uH1AqDNTCK1KjnIFUvPnODDi7vqiVn9tLfxpqT6Pgclk6QTnQwxJj6KPAYoX3pEWnl_KmqiXa5a0FZe0PkvVAtuZXk3KcaM0tGcVxkDEr9sJDmXMtLfyFavXy_7LJtgWLozYZGT_m4yqHxryqVURIuOPQ4sW3kDBq3WixTYo-pPj8w4Nlo_HyBrvje3HvI');">
+<div class="w-full h-full bg-noir-gold/10 mix-blend-overlay"></div>
+</div>
+<div class="flex-1 p-4 flex flex-col justify-center">
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-white text-xl font-bold tracking-wide">The Town</h3>
+<span class="bg-noir-gold/10 text-noir-gold text-[10px] font-bold px-2 py-1 rounded border border-noir-gold/30 uppercase tracking-wider">Protagonist</span>
+</div>
+<p class="text-[#a2afb3] text-sm leading-relaxed border-l-2 border-noir-gold/50 pl-3">
+                                Identify and vote out the Mafia before the town falls. Use special roles wisely.
+                            </p>
+</div>
+</div>
+</div>
+<!-- Preview of Next Section -->
+<div class="pt-4">
+<h4 class="text-white/60 text-xs font-bold uppercase tracking-widest mb-4">Dossier Preview</h4>
+<div class="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
+<!-- Role Mini Card 1 -->
+<div class="flex-shrink-0 w-28 bg-[#232d32] p-3 rounded border border-[#29383E] opacity-70">
+<div class="bg-primary/20 w-8 h-8 rounded flex items-center justify-center mb-2">
+<span class="material-symbols-outlined text-primary-teal text-sm">local_hospital</span>
+</div>
+<p class="text-white text-xs font-bold mb-1">Doctor</p>
+<div class="h-1 w-8 bg-primary-teal rounded-full"></div>
+</div>
+<!-- Role Mini Card 2 -->
+<div class="flex-shrink-0 w-28 bg-[#232d32] p-3 rounded border border-[#29383E] opacity-70">
+<div class="bg-primary/20 w-8 h-8 rounded flex items-center justify-center mb-2">
+<span class="material-symbols-outlined text-primary-teal text-sm">search</span>
+</div>
+<p class="text-white text-xs font-bold mb-1">Detective</p>
+<div class="h-1 w-8 bg-primary-teal rounded-full"></div>
+</div>
+<!-- Role Mini Card 3 -->
+<div class="flex-shrink-0 w-28 bg-[#232d32] p-3 rounded border border-[#29383E] opacity-70">
+<div class="bg-primary/20 w-8 h-8 rounded flex items-center justify-center mb-2">
+<span class="material-symbols-outlined text-primary-teal text-sm">person</span>
+</div>
+<p class="text-white text-xs font-bold mb-1">Villager</p>
+<div class="h-1 w-8 bg-primary-teal rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="h-10"></div>
+</div>
+<!-- Floating Action / Bottom Bar -->
+<div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#1A1E20] via-[#1A1E20] to-transparent z-20">
+<button class="w-full bg-primary-teal hover:bg-[#153641] text-white font-bold py-4 rounded-lg shadow-[0_0_15px_rgba(26,67,80,0.4)] flex items-center justify-center gap-2 border border-white/10 transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined">check_circle</span>
+<span>I Understand the Risks</span>
+</button>
+</div>
+</div>
+</body></html>
