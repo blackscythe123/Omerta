@@ -9,7 +9,7 @@ import 'package:flutter/foundation.dart';
 import '../models/player.dart';
 import '../models/game_state.dart';
 import '../network/game_communication.dart';
-import '../network/p2p_communication.dart';
+import '../network/lan_communication.dart';
 import 'game_rules.dart';
 import 'bot_controller.dart';
 
@@ -911,28 +911,262 @@ class GameManager extends ChangeNotifier {
   }
 
   Future<void> startP2P() async {
-    if (_comm is P2PCommunication) {
-      final p2p = _comm as P2PCommunication;
+    if (_comm is LANCommunication) {
+      final lan = _comm as LANCommunication;
       final local = localPlayer;
       if (local == null) return;
 
       if (isHost) {
-        await p2p.startHosting(local.name);
+        await lan.startHosting(
+            _currentRoomName ?? 'Game Room', local.name, local.id);
       } else {
-        await p2p.startDiscovery(local.name);
+        await lan.startDiscovery();
       }
     }
   }
 
   void stopP2P() {
-    if (_comm is P2PCommunication) {
-      (_comm as P2PCommunication).disconnect();
+    if (_comm is LANCommunication) {
+      (_comm as LANCommunication).dispose();
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LAN COMMUNICATION METHODS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  LANCommunication? _lanComm;
+  final List<RoomInfo> _discoveredRooms = [];
+  String? _currentRoomName;
+
+  /// Get discovered rooms
+  List<RoomInfo> get discoveredRooms => List.unmodifiable(_discoveredRooms);
+
+  /// Get current room name
+  String? get currentRoomName => _currentRoomName;
+
+  /// Initialize LAN hosting
+  Future<bool> createLANRoom(String playerName, String roomName) async {
+    _resetGame();
+    mode = GameMode.offlineP2P;
+    _isHost = true;
+    _currentRoomName = roomName;
+
+    final playerId = 'host_${DateTime.now().millisecondsSinceEpoch}';
+    localPlayerId = playerId;
+
+    // Create local player
+    players = [
+      Player(
+        id: playerId,
+        name: playerName,
+        role: Role.villager,
+        isBot: false,
+      )
+    ];
+
+    // Create LAN communication
+    _lanComm = LANCommunication(isHost: true);
+    _comm = _lanComm;
+
+    // Set up callbacks
+    _lanComm!.onPlayerJoined = (id, name) {
+      addRemotePlayer(id, name);
+    };
+
+    _lanComm!.onPlayerLeft = (id) {
+      players.removeWhere((p) => p.id == id);
+      _lanComm!.updateRoomInfo(playerCount: players.length);
+      _broadcastState();
+      notifyListeners();
+    };
+
+    // Start hosting
+    final success =
+        await _lanComm!.startHosting(roomName, playerName, playerId);
+    if (!success) {
+      _lanComm = null;
+      _comm = null;
+      return false;
+    }
+
+    // Attach receiver for state sync
+    attachReceiver(_lanComm!);
+
+    notifyListeners();
+    return true;
+  }
+
+  /// Start LAN room discovery
+  Future<void> startLANDiscovery() async {
+    _discoveredRooms.clear();
+    // Defer notifyListeners to avoid calling during build
+    Future.microtask(() => notifyListeners());
+
+    // Check if platform supports LAN
+    if (!LANCommunication.isSupported) {
+      print('[GameManager] LAN not supported on this platform');
+      return;
+    }
+
+    _lanComm = LANCommunication(isHost: false);
+    _lanComm!.onRoomDiscovered = (room) {
+      final existingIndex =
+          _discoveredRooms.indexWhere((r) => r.hostId == room.hostId);
+      if (existingIndex >= 0) {
+        _discoveredRooms[existingIndex] = room;
+      } else {
+        _discoveredRooms.add(room);
+      }
+      // Defer notifyListeners to avoid calling during build
+      Future.microtask(() => notifyListeners());
+    };
+
+    await _lanComm!.startDiscovery();
+  }
+
+  /// Stop LAN room discovery
+  void stopLANDiscovery() {
+    _lanComm?.stopDiscovery();
+    _discoveredRooms.clear();
+    notifyListeners();
+  }
+
+  /// Join a discovered LAN room
+  Future<bool> joinLANRoom(RoomInfo room, String playerName) async {
+    _resetGame();
+    mode = GameMode.offlineP2P;
+    _isHost = false;
+    _currentRoomName = room.roomName;
+
+    final playerId = 'player_${DateTime.now().millisecondsSinceEpoch}';
+    localPlayerId = playerId;
+
+    // Create local player
+    players = [
+      Player(
+        id: playerId,
+        name: playerName,
+        role: Role.villager,
+        isBot: false,
+      )
+    ];
+
+    // Set up LAN communication
+    if (_lanComm == null) {
+      _lanComm = LANCommunication(isHost: false);
+    }
+    _comm = _lanComm;
+
+    _lanComm!.onDisconnectedFromHost = () {
+      // Handle disconnection
+      notifyListeners();
+    };
+
+    _lanComm!.onJoinRejected = (reason) {
+      // Could store the reason for UI
+      notifyListeners();
+    };
+
+    // Attach receiver before joining
+    attachReceiver(_lanComm!);
+
+    // Join the room
+    final success = await _lanComm!.joinRoom(room, playerId, playerName);
+    if (!success) {
+      _lanComm = null;
+      _comm = null;
+      return false;
+    }
+
+    notifyListeners();
+    return true;
+  }
+
+  /// Join a LAN room by IP address directly (fallback when discovery fails)
+  Future<bool> joinLANRoomByIp(String ip, String playerName,
+      {int port = 41235}) async {
+    _resetGame();
+    mode = GameMode.offlineP2P;
+    _isHost = false;
+    _currentRoomName = 'Room';
+
+    final playerId = 'player_${DateTime.now().millisecondsSinceEpoch}';
+    localPlayerId = playerId;
+
+    // Create local player
+    players = [
+      Player(
+        id: playerId,
+        name: playerName,
+        role: Role.villager,
+        isBot: false,
+      )
+    ];
+
+    // Set up LAN communication
+    _lanComm = LANCommunication(isHost: false);
+    _comm = _lanComm;
+
+    _lanComm!.onDisconnectedFromHost = () {
+      notifyListeners();
+    };
+
+    _lanComm!.onJoinRejected = (reason) {
+      notifyListeners();
+    };
+
+    attachReceiver(_lanComm!);
+
+    // Join by IP directly
+    final success =
+        await _lanComm!.joinByIp(ip, playerId, playerName, port: port);
+    if (!success) {
+      _lanComm = null;
+      _comm = null;
+      return false;
+    }
+
+    notifyListeners();
+    return true;
+  }
+
+  /// Leave LAN room (client)
+  Future<void> leaveLANRoom() async {
+    if (_lanComm != null) {
+      if (_isHost) {
+        await _lanComm!.stopHosting();
+      } else {
+        await _lanComm!.leaveRoom();
+      }
+      _lanComm = null;
+      _comm = null;
+    }
+    _resetGame();
+    notifyListeners();
+  }
+
+  /// Kick a player from LAN room (host only)
+  void kickLANPlayer(String playerId) {
+    if (!_isHost || _lanComm == null) return;
+
+    _lanComm!.kickClient(playerId);
+    players.removeWhere((p) => p.id == playerId);
+    _lanComm!.updateRoomInfo(playerCount: players.length);
+    _broadcastState();
+    notifyListeners();
+  }
+
+  /// Check if connected to LAN
+  bool get isLANConnected => _lanComm?.isConnected ?? false;
+
+  /// Get host IP address (for host only, to show to players)
+  String? get hostIp => _lanComm?.currentRoom?.hostIp;
 
   @override
   void dispose() {
     stopP2P();
+    _lanComm?.dispose();
     _phaseTimer?.cancel();
     _countdownTimer?.cancel();
     super.dispose();

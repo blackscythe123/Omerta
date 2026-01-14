@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../game/game_manager.dart';
 import '../models/game_state.dart';
-import '../network/p2p_communication.dart';
+import '../network/lan_communication.dart';
 import 'how_to_play_screen.dart';
 import 'lobby_screen.dart';
 import 'player_setup_screen.dart';
@@ -280,12 +280,11 @@ class HomeScreen extends StatelessWidget {
                         ),
                         onPressed: () {
                           Navigator.pop(context);
-                          final p2p = P2PCommunication(
-                              isHost: true, serviceId: 'com.mafia.game');
+                          final lan = LANCommunication(isHost: true);
                           manager.setMode(GameMode.offlineP2P,
-                              comm: p2p, isHost: true);
+                              comm: lan, isHost: true);
                           manager.initializeOfflineGame('Boss', host: true);
-                          manager.attachReceiver(p2p);
+                          manager.attachReceiver(lan);
                           Navigator.of(context).push(
                             MaterialPageRoute(
                                 builder: (_) => const LobbyScreen()),
@@ -310,13 +309,12 @@ class HomeScreen extends StatelessWidget {
                         ),
                         onPressed: () {
                           Navigator.pop(context);
-                          final p2p = P2PCommunication(
-                              isHost: false, serviceId: 'com.mafia.game');
+                          final lan = LANCommunication(isHost: false);
                           manager.setMode(GameMode.offlineP2P,
-                              comm: p2p, isHost: false);
+                              comm: lan, isHost: false);
                           manager.initializeOfflineGame('Associate',
                               host: false);
-                          manager.attachReceiver(p2p);
+                          manager.attachReceiver(lan);
                           Navigator.of(context).push(
                             MaterialPageRoute(
                                 builder: (_) => const LobbyScreen()),
