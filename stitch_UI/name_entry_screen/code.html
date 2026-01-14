@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Name Entry Screen</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:ital,wght@0,100..900;1,100..900&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#1a4251",
+              "background-light": "#f3f2f2",
+              "background-dark": "#191d1f",
+            },
+            fontFamily: {
+              "display": ["Epilogue", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        /* Custom scrollbar hiding for cleaner mobile look */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white antialiased selection:bg-primary selection:text-white">
+<div class="relative flex h-screen w-full flex-col overflow-hidden">
+<!-- Navigation / Header -->
+<header class="flex items-center justify-between px-6 py-5 z-10">
+<button class="group flex size-10 items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-white/80 group-hover:text-white" style="font-size: 24px;">arrow_back</span>
+</button>
+<div class="flex flex-col items-center">
+<span class="text-[10px] font-bold tracking-[0.2em] text-primary/80 uppercase">Step 01</span>
+<span class="text-xs font-medium text-white/40 tracking-wider">PROFILE SETUP</span>
+</div>
+<div class="size-10"></div> <!-- Spacer for balance -->
+</header>
+<!-- Main Content Scroll Area -->
+<main class="flex-1 overflow-y-auto no-scrollbar px-6 pt-4 pb-24">
+<!-- Headline -->
+<div class="mb-8 text-center">
+<h1 class="text-3xl md:text-4xl font-black uppercase tracking-tight leading-none mb-2 text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">
+                    Establish<br/>Identity
+                </h1>
+<p class="text-sm text-white/50 font-normal max-w-[280px] mx-auto leading-relaxed">
+                    Create your dossier. This is how other players will identify you during the investigation.
+                </p>
+</div>
+<!-- Input Section -->
+<div class="mb-10 group/input">
+<div class="relative">
+<label class="block text-[11px] font-bold uppercase tracking-[0.15em] text-primary mb-3 pl-1" for="codename">Codename</label>
+<div class="relative">
+<input class="peer w-full bg-[#23292b] border-2 border-transparent focus:border-primary/50 text-white placeholder-white/20 rounded-lg py-4 px-5 text-lg font-medium focus:outline-none focus:ring-0 transition-all duration-300 shadow-inner" id="codename" placeholder="ENTER ALIAS" type="text" value=""/>
+<div class="absolute inset-0 rounded-lg pointer-events-none border border-white/5 peer-focus:border-primary/30 transition-colors"></div>
+<!-- Status Icon inside input -->
+<div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 peer-focus:opacity-100 transition-opacity duration-300">
+<span class="material-symbols-outlined text-primary" style="font-size: 20px;">edit</span>
+</div>
+</div>
+<div class="flex justify-between items-center mt-2 px-1">
+<span class="text-[10px] uppercase tracking-wider text-red-400/80 opacity-0 transition-opacity">Name taken</span>
+<span class="text-xs font-mono text-white/30">0/12</span>
+</div>
+</div>
+</div>
+<!-- Avatar Selection -->
+<div class="mb-6">
+<div class="flex items-center justify-between mb-4 px-1">
+<h3 class="text-[11px] font-bold uppercase tracking-[0.15em] text-white/60">Select Visage</h3>
+<span class="material-symbols-outlined text-white/20" style="font-size: 16px;">face</span>
+</div>
+<div class="grid grid-cols-4 gap-3 sm:gap-4">
+<!-- Avatar 1 (Selected) -->
+<button class="group relative aspect-square w-full rounded-xl overflow-hidden focus:outline-none">
+<div class="absolute inset-0 bg-primary opacity-20 group-hover:opacity-30 transition-opacity"></div>
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="w-full h-full bg-center bg-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300" data-alt="Minimalist flat illustration of a detective in a trench coat" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuD96xK7ek0r01zSruDTC-KreasG5qgIP2HZwUrD32c7nZPMEJ8IdrTDsgU2VNl2or_ryXGdKZlUfyUUl9blWruNc3-FqvuvNCU5vg0s-U44LrUBfe21wXzEHCo1DocIaaCg3H8ubFa-UQyZItH_26hEF7JArM9Xd7seYjx2EUkOZRzDByfISIxpJTZjdLFjWZjyncU0Amrvvk7UBQw_L1UwmDKLtbQlutJPW3YZ1BfxZRaSjtKkLiO5EF8Do7bJtYiz7fwZI-ySmTA');">
+</div>
+</div>
+<!-- Active State Ring -->
+<div class="absolute inset-0 border-2 border-primary rounded-xl shadow-[0_0_15px_rgba(26,66,81,0.5)]"></div>
+<!-- Checkmark badge -->
+<div class="absolute top-1 right-1 bg-primary text-white size-4 rounded-full flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined" style="font-size: 10px;">check</span>
+</div>
+</button>
+<!-- Avatar 2 -->
+<button class="group relative aspect-square w-full rounded-xl overflow-hidden focus:outline-none">
+<div class="absolute inset-0 bg-[#23292b] group-hover:bg-[#2a3235] transition-colors"></div>
+<div class="absolute inset-0 flex items-center justify-center p-1">
+<div class="w-full h-full bg-center bg-cover opacity-50 grayscale group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300" data-alt="Minimalist flat illustration of a mysterious woman in a hat" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuARw2RfwBtcakA9UJFeVZu_MyVk2H2wp9Sdm94cMM72zNk15t8_cyg8GIToENXIWtRInwWCG1x-3v0E7-wV0EpmS-iDfYWdyl0ugerigmNhrAqIir-guEVaY4yGsJqGvUtRdgqpYGu3VJgBp3IvDuhplXDi9jO4kYWya96f8VxtjGPmIjbWUHQt253wtMD8-5fecwkZ0gnFkTrAv-NV__ZPaWAHyJ4Fpsc5jiTubaczSVnsPNlYYTg-MVB9GgUArJwHkbnUwhhqzdU');">
+</div>
+</div>
+</button>
+<!-- Avatar 3 -->
+<button class="group relative aspect-square w-full rounded-xl overflow-hidden focus:outline-none">
+<div class="absolute inset-0 bg-[#23292b] group-hover:bg-[#2a3235] transition-colors"></div>
+<div class="absolute inset-0 flex items-center justify-center p-1">
+<div class="w-full h-full bg-center bg-cover opacity-50 grayscale group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300" data-alt="Minimalist flat illustration of a strong man silhouette" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBZzj8TjpmjKmzd8_QEocwAyY5GlV1wEGeshlxTcnQxggviMgI2y1DwpUFMr14ZDn_nqcYxZ6i8q2vVr6x0d0YXHIKAG3OfZWb6VErpP17FExbA6dhv840KP3p8ws5cQUgDavUGYrL0PW5GAs4mP-ZYpAU_BmzuYoh3MqlEoPDvEusNMa42BnwLRljE70ON0X32tgiBiBf6agobVTuEHaqmFND2YpH83rTyTnhU8khxTPi2emB7X9WruA4YQa5yY37sxHDwYHmcq9o');">
+</div>
+</div>
+</button>
+<!-- Avatar 4 -->
+<button class="group relative aspect-square w-full rounded-xl overflow-hidden focus:outline-none">
+<div class="absolute inset-0 bg-[#23292b] group-hover:bg-[#2a3235] transition-colors"></div>
+<div class="absolute inset-0 flex items-center justify-center p-1">
+<div class="w-full h-full bg-center bg-cover opacity-50 grayscale group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300" data-alt="Minimalist flat illustration of a doctor with a stethoscope" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDIAtjRDUm7oO0A4FnrC587_PlxjfdOlyuq9SxTybVtILiAIE1B0KjWCeVZjdgoYB5ixXT3lIsujZv5ZIAXtP6P_9XrO4ukLyX3ICJhUXH7Yti7vfZHd3ESbF9p0NZQPbW0vMTRpLha9gHf4nqQoP9P23dZ26ujkbulnjXV5SvBhw7eOtgGXlVNzc1JVuYiNpQE7CeEsxtV2a88wXD_pn0WJVd0sWZTnmY8DQW3Tkgfv2MTALL0_q60sBrrlOJ2Xn_IkoEqSIB0SeY');">
+</div>
+</div>
+</button>
+<!-- Avatar 5 -->
+<button class="group relative aspect-square w-full rounded-xl overflow-hidden focus:outline-none">
+<div class="absolute inset-0 bg-[#23292b] group-hover:bg-[#2a3235] transition-colors"></div>
+<div class="absolute inset-0 flex items-center justify-center p-1">
+<div class="w-full h-full bg-center bg-cover opacity-50 grayscale group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300" data-alt="Minimalist flat illustration of a sniper scope target" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCRoXfwG6rBbYUIzAVI5fdSCGxiYFOuFD1SSB00vELL6QQJCHxL2wcWvBigpTxUzNRxfwgXNoVtPPGnMkx30zVwfmMeX7I7KiTi0p83CurIba_nV886TkVe0VWT6kGFGi8lrcbJclil4znR7SwONhJyaa2zKTKNL6bIlgtAXdENdFCxHrobsd0dVVg4AlivWaMEBSfvu0kDgzUpCLcvAh41pJvO6PNu1P6pjZwh_LZsXZcWWRUFy5fjIVQsCQMdE7xqk_QUtLhPIOI');">
+</div>
+</div>
+</button>
+<!-- Avatar 6 -->
+<button class="group relative aspect-square w-full rounded-xl overflow-hidden focus:outline-none">
+<div class="absolute inset-0 bg-[#23292b] group-hover:bg-[#2a3235] transition-colors"></div>
+<div class="absolute inset-0 flex items-center justify-center p-1">
+<div class="w-full h-full bg-center bg-cover opacity-50 grayscale group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300" data-alt="Minimalist flat illustration of a police badge icon" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDHvL0ApermvMYOOpHZopLkClIrM6kTfAAUd0H1M7IvMLCdh2vkFsyPjWggAk22SxTSJ5FmrcO5CfeSfyuxFG7OIwqfC6Z8iGf0e6G3bs_CfgnCL0dnA2lJIMekz4YT419YYzM9hph82V6W7nJyGhf_aKf-KF_8Vwz61F097nTJiZIG2oXraiuYtIcZfyrN3LItXbP6WvOGzZMWenrZgXzL2oj-gxvOLS5zaQc9Or53C9uMNEnzj23EbjzmriG9FXOBhYp9J_hRTbg');">
+</div>
+</div>
+</button>
+<!-- Avatar 7 -->
+<button class="group relative aspect-square w-full rounded-xl overflow-hidden focus:outline-none">
+<div class="absolute inset-0 bg-[#23292b] group-hover:bg-[#2a3235] transition-colors"></div>
+<div class="absolute inset-0 flex items-center justify-center p-1">
+<div class="w-full h-full bg-center bg-cover opacity-50 grayscale group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300" data-alt="Minimalist flat illustration of a bag of money" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA4sLW3MLdxAr3NWI8uoPIfm0YGUzipajQAYjL9TSq022ccvoR5CcaM7NlxTZOXlVZd93NTN1e56ieUgAWGjz1KVJUkCrQ3cVI0o6HeU1Nz8CU6ox5mYAVUDPA2k-PW2rNUG1q2Ggz9I5KUb5zjxYcI381LPzIbLszc6G0tVGi4eoGsbtcWAGXT_X3tX2_42lPfqPw3U3Qk1gT99eAfeqqsrsBigezpsNplvRDzdsjXmWjpx1LSvWDQrxGnjqQWpmRsJeLQsiOKj34');">
+</div>
+</div>
+</button>
+<!-- Avatar 8 -->
+<button class="group relative aspect-square w-full rounded-xl overflow-hidden focus:outline-none">
+<div class="absolute inset-0 bg-[#23292b] group-hover:bg-[#2a3235] transition-colors"></div>
+<div class="absolute inset-0 flex items-center justify-center p-1">
+<div class="w-full h-full bg-center bg-cover opacity-50 grayscale group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-300" data-alt="Minimalist flat illustration of a ghost" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDX2deCz_hhNlW8gLjiDaxQ7HiE54nGUeFHBo3FrjOx1QLDqiXnfNQHTdVYoqXfmXbTemYxIUg9mmwPEypMGLIZKh4_Y63pbzV60W7R_Hcd4crLmBBVlFi9bihL6yUhQGLvICPBguzeueADr3uwLGsKShlHCS1DLFSR7rE-4wa6qbgtILDDMk34Sgs_6WIRESzPvoN1BDfpc1LBwLUjRta-zUYv7PmR2PmUFlYizpYRDRKRZJPpxWX_jTTxuaXml8_nlDHkgQIplP8');">
+</div>
+</div>
+</button>
+</div>
+</div>
+</main>
+<!-- Sticky Footer Action -->
+<div class="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-background-dark via-background-dark/95 to-transparent z-20">
+<button class="w-full h-14 bg-primary hover:bg-[#235566] text-white text-base font-bold tracking-widest uppercase rounded-lg shadow-lg shadow-primary/20 flex items-center justify-center gap-3 transition-all transform active:scale-[0.98]">
+<span>Confirm Identity</span>
+<span class="material-symbols-outlined" style="font-size: 20px;">arrow_forward</span>
+</button>
+</div>
+<!-- Ambient Noise Texture Overlay (Simulating Film Grain) -->
+<div class="pointer-events-none fixed inset-0 z-50 opacity-[0.03]" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDHD8nGI7v9Xqdc23SCJmsR_BjPCTpwYUfR24aDiD8Ej4MRGjsqkcSNQsf-RNOLGB_c0kuAlEbRSqA5MvK6xxeKgiDQH-DC2zLptKwvISttaTtfW50NUvEzPYKrYWPPUybxk0w5q8_gOh1WCHa4ofPxkRSYTqRVxnvLbkBqE9kIjG1-rJd_4cIfuSIzBvVvfU3rWbhcMfjOIqITNpo3S5cvvEQfeodrW-MrI6uP1QrCqeU0TyTq1X-v2Vi1iwc5ZnlPekr6eqUg87o');"></div>
+</div>
+</body></html>

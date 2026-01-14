@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Game Over - Mafia</title>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:ital,wght@0,100..900;1,100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1a4251",
+                        "background-light": "#f3f2f2",
+                        "background-dark": "#191d1f",
+                        "mafia-red": "#A01A24",
+                        "card-dark": "#29383E",
+                    },
+                    fontFamily: {
+                        "display": ["Epilogue", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+                    backgroundImage: {
+                        'noir-gradient': 'linear-gradient(to bottom, rgba(25, 29, 31, 0) 0%, rgba(25, 29, 31, 1) 100%)',
+                    }
+                },
+            },
+        }
+    </script>
+<style>/* Custom scrollbar for a cleaner look */
+::-webkit-scrollbar {
+    width: 6px
+    }
+::-webkit-scrollbar-track {
+    background: #191d1f
+    }
+::-webkit-scrollbar-thumb {
+    background: #2c3335;
+    border-radius: 3px
+    }
+.noir-noise {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0.05;
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuCohu7NJa4jqakH-dP_EZmSO8v8A11wN5EMHyadB0EK5WYrVFM7Kie6sIOwJi-pRwVrfqrW8zqvqAjnn8uFeL6jdsKJsU8CSON3_jMM1jGute4a9MEoKFbflxCp4GsjMYPOa3gGobWSFKabQdXhB_0O80r6vmT2GIuse0p_kINaKkqDbW972l1dpuszf4ERLVEbQTFCFHnt42BsYMHkUpcuAzMS_UqD8l4EbLg8gxlcAt5DG5fNKWdOXANUaPewbBX6bHlxUicrr4E)
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-white overflow-hidden">
+<!-- Noise Texture Overlay -->
+<div class="noir-noise"></div>
+<div class="relative flex h-full min-h-screen w-full flex-col max-w-md mx-auto shadow-2xl overflow-hidden">
+<!-- Scrollable Content -->
+<div class="flex-1 overflow-y-auto pb-32 no-scrollbar">
+<!-- Header Section -->
+<div class="flex flex-col items-center pt-8 pb-6 px-6 relative">
+<!-- Background Glow -->
+<div class="absolute top-0 left-1/2 -translate-x-1/2 w-full h-64 bg-mafia-red/10 blur-[80px] rounded-full pointer-events-none"></div>
+<span class="text-xs uppercase tracking-[0.2em] text-gray-400 mb-2 font-medium z-10">Game Over</span>
+<h1 class="text-5xl font-black text-center leading-[0.9] tracking-tighter text-mafia-red drop-shadow-lg z-10 mb-4">
+                    MAFIA<br/>WINS!
+                </h1>
+<p class="text-gray-300 text-base font-normal leading-normal text-center max-w-[260px] z-10 opacity-90">
+                    The city has fallen into silence. The family controls everything now.
+                </p>
+<!-- Winner Illustration -->
+<div class="mt-8 mb-4 relative w-full aspect-video rounded-xl overflow-hidden border border-mafia-red/20 shadow-2xl">
+<div class="absolute inset-0 bg-mafia-red/10 z-10 mix-blend-overlay"></div>
+<div class="w-full h-full bg-center bg-cover grayscale contrast-125 brightness-75" data-alt="A moody noir style illustration of a silhouette in a fedora smoking under a street light" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCb4UY4qKE_Vo9Igzd64_UYDW1J81FqXH5dEaWrIt1NrCmqF5eXhy09lKRbaMTtd-9yW8jHZyrRGeNf3b2aRQYn-byQT5DJiOXhrMCucSCOTmGGHriJ6hqatfCwst9sSkyYGEq4T7FxN4CRxa7CicgANeIF__W_a0KmF6iRpUlUlBj2C2zLRresyekFhyKTqhWmRNrg8x3m_mwF9r7pQV6ttsZM4N0NjR-aFm2t8jmpt_cSdQD10MP975YFR_bwwgeEaMC4Uh8kLSE");'>
+</div>
+<!-- MVP Badge Overlay -->
+<div class="absolute bottom-3 right-3 z-20 bg-mafia-red text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">star</span> MVP: Don Salieri
+                    </div>
+</div>
+</div>
+<!-- Player Manifest Section -->
+<div class="px-4">
+<div class="flex items-center justify-between mb-4 mt-2">
+<h2 class="text-white text-lg font-bold tracking-tight">Player Manifest</h2>
+<span class="text-xs text-gray-500 font-mono">ID: #8821X</span>
+</div>
+<div class="flex flex-col gap-3">
+<!-- Player 1: Mafia (Winner/Survived) -->
+<div class="flex items-center gap-4 bg-card-dark p-3 pr-4 rounded-xl border-l-4 border-mafia-red shadow-lg relative overflow-hidden group">
+<div class="absolute inset-0 bg-gradient-to-r from-mafia-red/5 to-transparent pointer-events-none"></div>
+<div class="relative shrink-0">
+<div class="w-12 h-12 rounded-full bg-gray-700 overflow-hidden border-2 border-mafia-red/50">
+<img alt="Don Salieri Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBIibtlyCJ77r08iAZL4PqsFWaffN4ZzBAy29Q2iK5_rxtvBX-LTV_lDQrVN4CRu7_ssnMmOMcyI--Oghflvmn657QDPBLGc42wPPJvUArpb6YlV1gS7XZPWif0E_xp16wZdk-w9wTW6U-ex8KO--JBiD10glHs9cZvmEjYNi3ZOE1X1Yd5dYFSi9tEpXlgJQkGmiE3aU_UXinM39-0w4qRVTgG8NoMT_q7XRBurdMIoRF1iyi-6DWXZPHCQl4S3LMx_EhwW8COaO8"/>
+</div>
+<div class="absolute -bottom-1 -right-1 bg-mafia-red rounded-full p-1 flex items-center justify-center border border-card-dark" title="Mafia Role">
+<span class="material-symbols-outlined text-white text-[12px] font-bold">local_police</span> <!-- Using a generic icon as a stand-in for role -->
+</div>
+</div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<div class="flex items-center gap-2">
+<p class="text-white text-base font-bold leading-tight truncate">Don Salieri</p>
+<span class="material-symbols-outlined text-yellow-500 text-[14px]">emoji_events</span>
+</div>
+<p class="text-mafia-red text-sm font-medium leading-tight truncate">Godfather</p>
+</div>
+<div class="shrink-0 flex flex-col items-end">
+<span class="text-green-400 text-xs font-bold uppercase tracking-wide">Survived</span>
+</div>
+</div>
+<!-- Player 2: Town (Loser/Eliminated) -->
+<div class="flex items-center gap-4 bg-card-dark/60 p-3 pr-4 rounded-xl border border-white/5 opacity-70 grayscale-[0.5]">
+<div class="relative shrink-0">
+<div class="w-12 h-12 rounded-full bg-gray-800 overflow-hidden border border-white/10">
+<img alt="Tommy Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfm4vmp75KUpqnT0ucCqaNBOM2_PbXlEahjWV-Aa982YypEBTNXDtGyUTNDqznpEM1G-qwrxq0C_WFro1AaG860-wHo9KLadN6naiMhyO4GqAMzqDM7k5HjRjca2E-4knQZ4oERxbtPKuZfpuQW3G92jTa2_y-rwQtfuDx2zqDYXRehamalYsWhQbohgr-gWd3aGu_VThGswm9T6tq4sl-ow1IgUPIv1_B-CpqeRuYnMksPOubIvuWQsynwREASXELWaeFcZAe-H8"/>
+</div>
+</div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<p class="text-gray-300 text-base font-medium leading-tight truncate decoration-gray-500">Tommy Gun</p>
+<p class="text-gray-500 text-sm font-normal leading-tight truncate">Detective</p>
+</div>
+<div class="shrink-0 flex flex-col items-end">
+<span class="text-gray-500 text-xs font-medium uppercase tracking-wide line-through decoration-mafia-red/50">Eliminated</span>
+<span class="text-[10px] text-gray-600">Night 2</span>
+</div>
+</div>
+<!-- Player 3: Town (Loser/Eliminated) -->
+<div class="flex items-center gap-4 bg-card-dark/60 p-3 pr-4 rounded-xl border border-white/5 opacity-70 grayscale-[0.5]">
+<div class="relative shrink-0">
+<div class="w-12 h-12 rounded-full bg-gray-800 overflow-hidden border border-white/10">
+<img alt="Paulie Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAh9b8LiTBhEwlb2mVdPbC2eSWTc9cn8ycNMSlpsEOoDuwckuf5gN5Fz1OluUIkVtkWkuMqCvdU36NNc78Pg5YSI40Ns5aTMrVNVUlFKM3B8t5zU8reajAFSKEOVEhh2-MYF11GWMb_u5hcF07okFCAaCYvWpJXo0W4eS7Ck7tMhowXC-XhewswQbpE64iNUwn35XcjBHJKTQREOqnxUk5VLZfGLGFlFucREYVEiyZo7rZDv7QW52ZrdIHNHoVZQXOIxvbLdBKEBlU"/>
+</div>
+</div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<p class="text-gray-300 text-base font-medium leading-tight truncate">Paulie Walnuts</p>
+<p class="text-gray-500 text-sm font-normal leading-tight truncate">Civilian</p>
+</div>
+<div class="shrink-0 flex flex-col items-end">
+<span class="text-gray-500 text-xs font-medium uppercase tracking-wide line-through decoration-mafia-red/50">Eliminated</span>
+<span class="text-[10px] text-gray-600">Day 3</span>
+</div>
+</div>
+<!-- Player 4: Mafia (Winner/Survived) -->
+<div class="flex items-center gap-4 bg-card-dark p-3 pr-4 rounded-xl border-l-4 border-mafia-red shadow-lg relative overflow-hidden">
+<div class="relative shrink-0">
+<div class="w-12 h-12 rounded-full bg-gray-700 overflow-hidden border-2 border-mafia-red/50">
+<img alt="Vito Avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZ_nmaFMS8Ca2uYVg7YyL22Jdbgvmfd-CmaWLlzRZsyl70jPlM836COPx_eCJLBLo2gfXo5IOE3FmnorizsBczP1aFlFf5UoZG0hB-VRvONPiiI0rEVqD_i6hi40G4iOhxHDdLI5Ihl6pXnbOQ-p2yyjyEEIuQfjEcFm-3KWnsS_fxh6kfGh-tZETbQH0gdVzFmz21nDvYSU0St3gF1MPjZLSUqc4ZFdG1Mz-uObB5nEIK0JJ6U1J23aTY7FzpNGZYsbUIEc7K--U"/>
+</div>
+<div class="absolute -bottom-1 -right-1 bg-mafia-red rounded-full p-1 flex items-center justify-center border border-card-dark">
+<span class="material-symbols-outlined text-white text-[12px]">theater_comedy</span>
+</div>
+</div>
+<div class="flex flex-col justify-center flex-1 min-w-0">
+<p class="text-white text-base font-bold leading-tight truncate">Vito Scaletta</p>
+<p class="text-mafia-red text-sm font-medium leading-tight truncate">Consigliere</p>
+</div>
+<div class="shrink-0 flex flex-col items-end">
+<span class="text-green-400 text-xs font-bold uppercase tracking-wide">Survived</span>
+</div>
+</div>
+<!-- Spacer for scrolling behind fixed footer -->
+<div class="h-6"></div>
+</div>
+</div>
+</div>
+<!-- Fixed Footer Actions -->
+<div class="absolute bottom-0 left-0 w-full z-40 bg-background-dark/95 backdrop-blur-md border-t border-white/5 pb-8 pt-4 px-6 rounded-t-2xl">
+<div class="flex flex-col gap-3">
+<button class="flex items-center justify-center gap-2 w-full h-12 rounded-full border border-mafia-red text-mafia-red font-bold text-sm uppercase tracking-wider hover:bg-mafia-red/10 transition-colors">
+<span class="material-symbols-outlined text-[18px]">share</span>
+                    Share Statistics
+                </button>
+<button class="flex items-center justify-center gap-2 w-full h-14 rounded-full bg-primary text-white font-bold text-base uppercase tracking-wider shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined text-[20px]">meeting_room</span>
+                    Back to Lobby
+                </button>
+</div>
+</div>
+</div>
+</body></html>

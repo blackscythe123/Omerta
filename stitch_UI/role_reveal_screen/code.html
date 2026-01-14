@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Role Reveal - Mafia</title>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1a4251",
+                        "primary-dark": "#122e39",
+                        "accent-red": "#8a2be2", /* Changed to deep purple/red for noir vibe */
+                        "background-light": "#f3f2f2",
+                        "background-dark": "#191d1f",
+                        "paper-dark": "#1e2324",
+                    },
+                    fontFamily: {
+                        "display": ["Epilogue", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem", "2xl": "1rem" },
+                    backgroundImage: {
+                        'noise': "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E\")",
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom styles for the card flip/reveal effect */
+        .reveal-content {
+            transition: opacity 0.5s ease-in-out, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        
+        .reveal-cover {
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease-out;
+            transform-origin: bottom center;
+        }
+
+        /* Checkbox hack: When checked, hide cover, show content */
+        #reveal-toggle:checked ~ .card-container .reveal-cover {
+            transform: translateY(110%) rotate(-5deg);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #reveal-toggle:checked ~ .card-container .reveal-content {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Initial state of content */
+        .reveal-content {
+            opacity: 0.5;
+            transform: scale(0.95);
+        }
+        
+        #reveal-toggle:checked ~ .action-bar {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-white overflow-hidden h-screen flex flex-col">
+<!-- Header -->
+<header class="flex items-center bg-[#121516] p-4 pb-2 justify-between z-30 shrink-0 border-b border-white/5">
+<div class="w-10">
+<!-- Back button placeholder if needed -->
+</div>
+<h2 class="text-white text-lg font-bold leading-tight tracking-widest flex-1 text-center uppercase opacity-80">Mission Brief</h2>
+<div class="w-10 flex justify-end">
+<span class="material-symbols-outlined text-white/50 text-xl">wifi_off</span>
+</div>
+</header>
+<!-- Privacy Warning -->
+<div class="bg-[#121516] pt-4 pb-2 z-30 shrink-0">
+<div class="flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[#a2afb3] text-sm">visibility_off</span>
+<p class="text-[#a2afb3] text-xs font-bold tracking-widest uppercase text-center">Eyes Only • Secure Line</p>
+</div>
+</div>
+<!-- Main Content Area -->
+<main class="relative flex-1 w-full flex flex-col items-center justify-center px-6 py-4 perspective-1000">
+<!-- The Invisible Checkbox to drive the interaction -->
+<input class="peer hidden" id="reveal-toggle" type="checkbox"/>
+<div class="card-container relative w-full max-w-sm aspect-[3/4] group">
+<!-- REVEALED STATE (The Role Card) -->
+<!-- Located visibly in DOM, but covered initially by the .reveal-cover -->
+<div class="reveal-content absolute inset-0 bg-paper-dark rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden border border-white/10 flex flex-col h-full ring-1 ring-white/5">
+<!-- Background Image Layer -->
+<div class="absolute inset-0 z-0">
+<div class="absolute inset-0 bg-gradient-to-t from-[#1e2324] via-[#1e2324]/80 to-transparent z-10"></div>
+<!-- Noir style gradient overlay -->
+<div class="absolute inset-0 bg-gradient-to-b from-primary/30 to-[#1e2324] mix-blend-overlay z-10"></div>
+<div class="w-full h-full bg-center bg-cover grayscale contrast-125" data-alt="Abstract moody silhouette of a man in a fedora smoking in a dark alley" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBZ_16CRn6zdN-qHlprbu20tcJLnz25AsE0IF3fxC2lN6-LEZ_Jrv7kfAgSqdJn7ClEFBd5kc6_-12tuXl4En9FIJf_Ee_KDaY6LKpeVT_7TUb35h9Zaly5R5Eb4hn-HYuu7P3DdHRzMbcjBteNW1cpbkYWKiQaDyzBmdQPYBo3HgGIGRmjcioa3WVRwH0O3LYJcVfVq2rKuze-znw_Fj7IUwfZulQAzT4cxUYhHJHc2zL1cMGBPsJj684JzhZx4-rpEyFir77bYMU");'>
+</div>
+</div>
+<!-- Content Layer -->
+<div class="relative z-20 flex flex-col h-full justify-end p-6 pb-8">
+<!-- Role Header -->
+<div class="mb-4">
+<div class="flex items-center gap-2 mb-2">
+<span class="px-2 py-0.5 rounded-sm bg-red-900/50 border border-red-500/30 text-red-200 text-[10px] font-bold tracking-widest uppercase">Target</span>
+<span class="px-2 py-0.5 rounded-sm bg-white/5 border border-white/10 text-gray-400 text-[10px] font-bold tracking-widest uppercase">Class: Hostile</span>
+</div>
+<h1 class="text-4xl font-black text-white leading-none tracking-tighter drop-shadow-lg mb-1">THE DON</h1>
+<p class="text-primary text-sm font-bold tracking-[0.2em] uppercase">Capo Di Tutti Capi</p>
+</div>
+<!-- Divider -->
+<div class="h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent my-4"></div>
+<!-- Stats / Details -->
+<div class="space-y-4">
+<div class="flex gap-4">
+<div class="bg-black/40 backdrop-blur-sm rounded-lg p-3 flex-1 border border-white/5">
+<p class="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Affiliation</p>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-red-400 text-lg">diversity_3</span>
+<span class="text-sm font-bold text-white">The Mafia</span>
+</div>
+</div>
+<div class="bg-black/40 backdrop-blur-sm rounded-lg p-3 flex-1 border border-white/5">
+<p class="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Action</p>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg">local_fire_department</span>
+<span class="text-sm font-bold text-white">Eliminate</span>
+</div>
+</div>
+</div>
+<!-- Description -->
+<div class="bg-black/20 rounded-lg p-3 border-l-2 border-primary">
+<p class="text-gray-300 text-xs leading-relaxed">
+<span class="text-white font-bold">Ability:</span> Order a hit each night. You have the final say on who sleeps with the fishes.
+                            </p>
+<p class="text-gray-300 text-xs leading-relaxed mt-2">
+<span class="text-white font-bold">Win Condition:</span> Outnumber the civilians.
+                            </p>
+</div>
+</div>
+</div>
+</div>
+<!-- HIDDEN STATE (The Cover / Dossier) -->
+<!-- Label acts as the button to reveal -->
+<label class="reveal-cover absolute inset-0 z-30 cursor-pointer" for="reveal-toggle">
+<div class="w-full h-full bg-[#2c3439] rounded-xl shadow-2xl flex flex-col border border-white/5 relative overflow-hidden">
+<!-- Texture Noise -->
+<div class="absolute inset-0 bg-noise opacity-30 pointer-events-none"></div>
+<!-- Top Tab of Folder -->
+<div class="h-12 bg-[#232a2e] w-full border-b border-black/20 flex items-center px-4 justify-between">
+<div class="w-24 h-1.5 bg-white/10 rounded-full"></div>
+<div class="text-[10px] font-mono text-white/30">REF: 77-21-X</div>
+</div>
+<!-- Main Body of Cover -->
+<div class="flex-1 flex flex-col items-center justify-center p-8 relative">
+<!-- Diagonal Stripes Pattern -->
+<div class="absolute inset-0 opacity-[0.03]" style="background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, #000 10px, #000 20px);"></div>
+<div class="w-24 h-24 rounded-full bg-black/20 border-2 border-white/5 flex items-center justify-center mb-8 shadow-inner">
+<span class="material-symbols-outlined text-5xl text-white/20">fingerprint</span>
+</div>
+<div class="border-2 border-dashed border-white/10 p-6 w-full text-center rounded bg-black/10 backdrop-blur-sm">
+<h3 class="text-white text-xl font-bold tracking-widest uppercase mb-1">Confidential</h3>
+<p class="text-primary text-xs font-bold tracking-[0.2em] uppercase mb-4">Eyes Only</p>
+<div class="inline-flex items-center gap-2 text-white/50 text-sm animate-pulse">
+<span class="material-symbols-outlined text-lg">touch_app</span>
+<span class="font-medium">Tap to Decrypt</span>
+</div>
+</div>
+<!-- Decorative stamp -->
+<div class="absolute bottom-12 right-8 transform -rotate-12 border-4 border-red-900/40 px-4 py-2 rounded opacity-60 mix-blend-multiply">
+<p class="text-red-900/60 font-black text-2xl uppercase tracking-widest">Top Secret</p>
+</div>
+</div>
+</div>
+</label>
+</div>
+<!-- Action Button (Only appears after reveal) -->
+<div class="action-bar absolute bottom-8 left-0 w-full px-6 opacity-0 transition-all duration-700 delay-300 translate-y-4">
+<button class="w-full bg-primary hover:bg-primary/90 text-white font-bold h-14 rounded-lg uppercase tracking-wider shadow-lg shadow-primary/20 flex items-center justify-center gap-2 group transition-all">
+<span>Enter The Night</span>
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+</button>
+<p class="text-center text-white/20 text-[10px] mt-4 uppercase tracking-widest">Do not discuss your role yet</p>
+</div>
+</main>
+</body></html>

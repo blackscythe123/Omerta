@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Waiting Screen</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:ital,wght@0,100..900;1,100..900&amp;family=Noto+Sans:ital,wght@0,100..900;1,100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1a4251",
+                        "background-light": "#f3f2f2",
+                        "background-dark": "#191d1f",
+                    },
+                    fontFamily: {
+                        "display": ["Epilogue", "sans-serif"],
+                        "body": ["Noto Sans", "sans-serif"],
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>/* Custom subtle grain texture overlay */
+.bg-grain {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuDFvEukjvNptZBOdQPMW9cMNjZAGSV0HGLg4QyRSqeXE4cO2itrS21r-PlXG2iZfKkHgzVUOD9oeOj1M72U05_2JAKDwRCnbeVa-oY6oab7qHhVqqEo_4Glj7xQHpssnjm1FIuB2_Vqp-j1hogAsvQUe7KB8VNyWDPpIpNhqXRqVCH41U4abZqgNdjwTS2acVU_LFJ6dsfbtS2H3Hdkf09SChuP21exdVRp74Cx_HxKzoL3jvx-NvxYN_q0f5MYB0jn7FkZk8wFpkc)
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark min-h-screen flex flex-col font-display selection:bg-primary selection:text-white overflow-hidden relative">
+<!-- Atmospheric Overlay Layers -->
+<div class="absolute inset-0 pointer-events-none bg-grain opacity-20 z-10"></div>
+<!-- Background Cloud Shapes (Static representation of atmosphere) -->
+<div class="absolute top-[15%] left-[-20%] w-[60%] h-[30%] bg-primary/10 blur-[80px] rounded-full pointer-events-none"></div>
+<div class="absolute bottom-[20%] right-[-10%] w-[50%] h-[40%] bg-primary/20 blur-[100px] rounded-full pointer-events-none"></div>
+<!-- Main Content Container -->
+<div class="relative z-20 flex flex-col h-full min-h-screen w-full p-6 justify-between items-center text-center">
+<!-- Top Status Bar -->
+<div class="w-full flex flex-col items-center pt-2">
+<div class="bg-white/5 backdrop-blur-sm border border-white/10 px-4 py-1.5 rounded-full mb-2">
+<p class="text-white/60 text-xs font-medium tracking-widest uppercase">Night Phase • Round 2</p>
+</div>
+</div>
+<!-- Center Content: Moon & Headline -->
+<div class="flex flex-col items-center justify-center w-full flex-grow gap-8">
+<!-- Moon Visualization -->
+<div class="relative w-48 h-48 flex items-center justify-center">
+<!-- Outer Glow -->
+<div class="absolute inset-0 bg-primary/30 rounded-full blur-3xl scale-125"></div>
+<!-- Moon Image -->
+<div class="w-full h-full rounded-full bg-cover bg-center shadow-2xl relative overflow-hidden border border-white/10" data-alt="A minimalist, textured full moon isolated against a dark void" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA97Su52C_O8fdHcEEBFZ_ZuChYRH7lhJlIXMPVU3GGOE3lnZmZGk5OLD3OQCGLK7NGkYSMHV7N55lXuKggorlaR1VCYbqaPU7aT-0BWJnQySVON9Ea-6wYEoU8F7jP1CGCNEPkplGBF0Qt7TvT4XpI-xL8v-8DweLCtuRDF_RjpDYGoZePSC7xNlrdMG-XQE5uv8_jDa1HQr3cm4F01jAGmidFBUTl_1C4zM2S31JFLN08OP0X6HT1bMYkEe0DRvEncafGIW1kWtc'); box-shadow: inset -20px -20px 60px rgba(0,0,0,0.8);">
+<!-- Overlay to tint the moon slightly towards the theme -->
+<div class="absolute inset-0 bg-primary/20 mix-blend-overlay"></div>
+</div>
+<!-- Abstract Cloud overlaying moon slightly -->
+<div class="absolute -bottom-4 -right-8 text-background-dark opacity-90">
+<span class="material-symbols-outlined text-[120px] scale-150" style="font-variation-settings: 'FILL' 1;">cloud</span>
+</div>
+</div>
+<!-- Headline -->
+<div class="flex flex-col gap-2 max-w-xs mx-auto">
+<h1 class="text-white text-4xl font-bold tracking-tight leading-none drop-shadow-lg">
+                    The Town<br/>is Asleep...
+                </h1>
+<p class="text-white/40 text-sm font-light leading-relaxed px-4">
+                    Shhh. Keep your screen hidden. The shadows are watching.
+                </p>
+</div>
+</div>
+<!-- Bottom Status Area -->
+<div class="w-full pb-8 flex flex-col items-center gap-6">
+<!-- Loader State -->
+<div class="flex flex-col items-center gap-3">
+<div class="flex gap-2">
+<div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+<div class="w-2 h-2 rounded-full bg-primary/60 animate-pulse delay-75"></div>
+<div class="w-2 h-2 rounded-full bg-primary/30 animate-pulse delay-150"></div>
+</div>
+<p class="text-primary text-sm font-medium tracking-wide">Waiting for others...</p>
+</div>
+<!-- Role Reminder Pill -->
+<div class="bg-[#121516] border border-white/5 rounded-lg px-6 py-3 w-full max-w-[280px] shadow-lg flex items-center justify-between group">
+<div class="flex items-center gap-3">
+<div class="bg-primary/20 p-1.5 rounded text-primary">
+<span class="material-symbols-outlined text-lg">person</span>
+</div>
+<div class="flex flex-col items-start text-left">
+<span class="text-white/40 text-[10px] uppercase tracking-wider font-bold">Your Role</span>
+<span class="text-white text-sm font-semibold">Villager</span>
+</div>
+</div>
+<!-- Visual indicator for hidden info -->
+<span class="material-symbols-outlined text-white/20 text-lg">visibility_off</span>
+</div>
+</div>
+</div>
+</body></html>
