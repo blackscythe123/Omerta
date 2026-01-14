@@ -21,6 +21,13 @@ class RoomInfo {
   final int maxPlayers;
   final bool inProgress;
   final bool isPrivate; // Whether the room requires a PIN to join
+  final bool chatEnabled; // Whether lobby chat is enabled
+  final bool moderatorMode; // Coming soon feature
+
+  // Runtime state (not saved, only for discovery)
+  bool _isCountingDown = false;
+  bool get isCountingDown => _isCountingDown;
+  set isCountingDown(bool value) => _isCountingDown = value;
 
   RoomInfo({
     required this.hostId,
@@ -32,6 +39,8 @@ class RoomInfo {
     this.maxPlayers = 10,
     this.inProgress = false,
     this.isPrivate = false,
+    this.chatEnabled = true,
+    this.moderatorMode = false,
   });
 
   /// Create a copy with updated fields
@@ -45,6 +54,8 @@ class RoomInfo {
     int? maxPlayers,
     bool? inProgress,
     bool? isPrivate,
+    bool? chatEnabled,
+    bool? moderatorMode,
   }) {
     return RoomInfo(
       hostId: hostId ?? this.hostId,
@@ -56,6 +67,8 @@ class RoomInfo {
       maxPlayers: maxPlayers ?? this.maxPlayers,
       inProgress: inProgress ?? this.inProgress,
       isPrivate: isPrivate ?? this.isPrivate,
+      chatEnabled: chatEnabled ?? this.chatEnabled,
+      moderatorMode: moderatorMode ?? this.moderatorMode,
     );
   }
 
@@ -70,6 +83,8 @@ class RoomInfo {
         'maxPlayers': maxPlayers,
         'inProgress': inProgress,
         'isPrivate': isPrivate,
+        'chatEnabled': chatEnabled,
+        'moderatorMode': moderatorMode,
       };
 
   factory RoomInfo.fromJson(Map<String, dynamic> json) => RoomInfo(
@@ -82,6 +97,8 @@ class RoomInfo {
         maxPlayers: json['maxPlayers'] ?? 10,
         inProgress: json['inProgress'] ?? false,
         isPrivate: json['isPrivate'] ?? false,
+        chatEnabled: json['chatEnabled'] ?? true,
+        moderatorMode: json['moderatorMode'] ?? false,
       );
 
   @override
@@ -122,6 +139,8 @@ class LANCommunication implements GameCommunication {
   Function(String senderId, String senderName, String message)?
       onChatMessage; // Lobby chat
   Function(String playerId, String reason)? onPlayerKicked; // Kick notification
+  Function(int value)? onCountdownReceived; // Countdown updates
+  Function()? onGameStartReceived; // Game start signal
 
   // State
   final bool isHost;
@@ -310,6 +329,39 @@ class LANCommunication implements GameCommunication {
     }
   }
 
+  /// Update room settings (host only)
+  void updateRoomSettings({
+    int? maxPlayers,
+    bool? isPrivate,
+    String? newPin,
+    bool? chatEnabled,
+    bool? moderatorMode,
+  }) {
+    if (!isHost || _currentRoom == null) return;
+
+    // Update local room info
+    _currentRoom = _currentRoom!.copyWith(
+      maxPlayers: maxPlayers,
+      isPrivate: isPrivate,
+      chatEnabled: chatEnabled,
+      moderatorMode: moderatorMode,
+    );
+
+    // Update PIN if changed (private only)
+    if (newPin != null && _currentRoom!.isPrivate) {
+      _roomPin = newPin;
+    }
+
+    // Broadcast settings to all clients
+    broadcastToClients({
+      'type': 'room_settings_update',
+      'maxPlayers': _currentRoom!.maxPlayers,
+      'isPrivate': _currentRoom!.isPrivate,
+      'chatEnabled': _currentRoom!.chatEnabled,
+      'moderatorMode': _currentRoom!.moderatorMode,
+    });
+  }
+
   void _handleClientConnection(Socket socket) {
     final address = '${socket.remoteAddress.address}:${socket.remotePort}';
     print('[LAN] Client connecting from $address');
@@ -352,11 +404,14 @@ class LANCommunication implements GameCommunication {
         final playerName = message['playerName'] as String;
         final providedPin = message['pin'] as String?;
 
-        // Check if game in progress
-        if (_currentRoom?.inProgress == true) {
+        // Check if game in progress or counting down
+        if (_currentRoom?.inProgress == true ||
+            _currentRoom?.isCountingDown == true) {
           _sendToSocket(socket, {
             'type': 'join_rejected',
-            'reason': 'Game already in progress',
+            'reason': _currentRoom?.isCountingDown == true
+                ? 'Game is starting'
+                : 'Game already in progress',
           });
           socket.close();
           return;
@@ -753,6 +808,27 @@ class LANCommunication implements GameCommunication {
         onDisconnectedFromHost?.call(reason);
         break;
 
+      case 'room_settings_update':
+        // Update local room info with new settings
+        if (_currentRoom != null) {
+          _currentRoom = _currentRoom!.copyWith(
+            maxPlayers: message['maxPlayers'] as int?,
+            isPrivate: message['isPrivate'] as bool?,
+            chatEnabled: message['chatEnabled'] as bool?,
+            moderatorMode: message['moderatorMode'] as bool?,
+          );
+        }
+        break;
+
+      case 'start_countdown':
+        final value = message['value'] as int? ?? 0;
+        onCountdownReceived?.call(value);
+        break;
+
+      case 'start_game':
+        onGameStartReceived?.call();
+        break;
+
       case 'room_closed':
         print('[LAN] Room closed by host');
         _isConnected = false;
@@ -881,6 +957,25 @@ class LANCommunication implements GameCommunication {
       'senderId': senderId,
       'senderName': senderName,
       'message': message,
+    });
+  }
+
+  // ============ COUNTDOWN & GAME START ============
+
+  /// Broadcast countdown value to all clients (host only)
+  void broadcastCountdown(int value) {
+    if (!isHost) return;
+    broadcastToClients({
+      'type': 'start_countdown',
+      'value': value,
+    });
+  }
+
+  /// Broadcast game start to all clients (host only)
+  void broadcastGameStart() {
+    if (!isHost) return;
+    broadcastToClients({
+      'type': 'start_game',
     });
   }
 

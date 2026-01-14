@@ -17,6 +17,8 @@ import '../game/game_manager.dart';
 import '../models/game_state.dart';
 import '../models/player.dart' as models;
 import 'role_reveal_screen.dart';
+import 'widgets/countdown_overlay.dart';
+import 'widgets/room_settings_dialog.dart';
 
 class LobbyScreenNew extends StatefulWidget {
   final String playerName;
@@ -51,26 +53,9 @@ class _LobbyScreenNewState extends State<LobbyScreenNew> {
 
   void _startGame() {
     final manager = context.read<GameManager>();
-    manager.startGame();
 
-    // Navigate to role reveal with role
-    final localPlayer = manager.localPlayer;
-    if (localPlayer != null) {
-      final role = _mapRole(localPlayer.role);
-      final teammates = localPlayer.role == models.Role.mafia ||
-              localPlayer.role == models.Role.godfather
-          ? manager
-              .aliveMafia()
-              .map((p) => p.name)
-              .where((n) => n != localPlayer.name)
-              .toList()
-          : null;
-
-      Navigator.pushReplacementNamed(context, '/role-reveal', arguments: {
-        'role': role,
-        'teammates': teammates,
-      });
-    }
+    // Start countdown instead of immediate start
+    manager.startGameCountdown();
   }
 
   GameRole _mapRole(models.Role role) {
@@ -98,6 +83,39 @@ class _LobbyScreenNewState extends State<LobbyScreenNew> {
     final manager = context.read<GameManager>();
     manager.leaveLANRoom();
     Navigator.popUntil(context, (route) => route.isFirst);
+  }
+
+  void _showRoomSettings(BuildContext context, GameManager manager) {
+    final room = manager.currentRoom;
+    if (room == null) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => RoomSettingsDialog(
+        currentMaxPlayers: room.maxPlayers,
+        currentIsPrivate: room.isPrivate,
+        currentPin: manager.roomPin,
+        currentChatEnabled: room.chatEnabled,
+        currentModeratorMode: room.moderatorMode,
+        onSave: ({maxPlayers, isPrivate, newPin, chatEnabled, moderatorMode}) {
+          manager.updateRoomSettings(
+            maxPlayers: maxPlayers,
+            isPrivate: isPrivate,
+            newPin: newPin,
+            chatEnabled: chatEnabled,
+            moderatorMode: moderatorMode,
+          );
+
+          // Show confirmation
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Room settings updated'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _showDisconnectDialog(GameManager manager) {
@@ -144,11 +162,10 @@ class _LobbyScreenNewState extends State<LobbyScreenNew> {
     return baseData;
   }
 
-  // Show QR code dialog for sharing host IP
-  void _showQrDialog(String ip) {
+  // Show QR code dialog for sharing host IP:PORT
+  void _showQrDialog(String ip, int port) {
     final qrKey = GlobalKey();
     final manager = context.read<GameManager>();
-    final port = 41235; // Default TCP port
     final pin = manager.roomPin;
     final isPrivate = manager.isRoomPrivate;
     final qrData = _generateQrData(ip, port, pin);
@@ -195,7 +212,7 @@ class _LobbyScreenNewState extends State<LobbyScreenNew> {
             Text('Scan this QR to join', style: AppTextStyles.bodyMedium),
             const SizedBox(height: 8),
             Text(
-              ip,
+              '$ip:$port',
               style: AppTextStyles.labelSmall.copyWith(
                 color: AppColors.textMuted,
               ),
@@ -239,7 +256,8 @@ class _LobbyScreenNewState extends State<LobbyScreenNew> {
                   label: const Text('SHARE'),
                   onPressed: () async {
                     Navigator.pop(context);
-                    await _shareQr(qrKey, ip, pin: pin, isPrivate: isPrivate);
+                    await _shareQr(qrKey, ip, port,
+                        pin: pin, isPrivate: isPrivate);
                   },
                 ),
               ],
@@ -250,7 +268,7 @@ class _LobbyScreenNewState extends State<LobbyScreenNew> {
     );
   }
 
-  Future<void> _shareQr(GlobalKey key, String ip,
+  Future<void> _shareQr(GlobalKey key, String ip, int port,
       {String? pin, bool isPrivate = false}) async {
     try {
       final boundary =
@@ -268,8 +286,8 @@ class _LobbyScreenNewState extends State<LobbyScreenNew> {
       await file.writeAsBytes(bytes);
 
       final shareText = isPrivate && pin != null
-          ? 'Join my Mafia room: $ip (PIN: $pin)'
-          : 'Join my Mafia room: $ip';
+          ? 'Join my Mafia room: $ip:$port (PIN: $pin)'
+          : 'Join my Mafia room: $ip:$port';
 
       await Share.shareXFiles([XFile(file.path)], text: shareText);
     } catch (e) {
@@ -294,8 +312,8 @@ class _LobbyScreenNewState extends State<LobbyScreenNew> {
       });
     }
 
-    // Auto-navigate when game starts (for non-host)
-    if (manager.phase != GamePhase.lobby && !widget.isHost) {
+    // Auto-navigate when game starts
+    if (manager.phase != GamePhase.lobby) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           final localPlayer = manager.localPlayer;
@@ -326,258 +344,320 @@ class _LobbyScreenNewState extends State<LobbyScreenNew> {
           _showLeaveDialog();
         }
       },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(widget.roomName?.toUpperCase() ?? 'LOBBY'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: _showLeaveDialog,
-          ),
-        ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.all(24),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.cardBorder),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+      child: Stack(
+        children: [
+          Scaffold(
+            appBar: AppBar(
+              title: Text(widget.roomName?.toUpperCase() ?? 'LOBBY'),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _showLeaveDialog,
+              ),
+              actions: [
+                // Room settings button (host only)
+                if (widget.isHost && manager.mode == GameMode.offlineP2P)
+                  IconButton(
+                    icon: const Icon(Icons.settings),
+                    onPressed: () => _showRoomSettings(context, manager),
+                    tooltip: 'Room Settings',
+                  ),
+              ],
+            ),
+            body: SafeArea(
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.cardBorder),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.groups,
-                                  color: AppColors.primary, size: 20),
-                              const SizedBox(width: 8),
-                              Text(
-                                '${players.length} PLAYERS',
-                                style: AppTextStyles.titleMedium,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${manager.readyPlayerCount}/${players.length} READY',
-                            style: AppTextStyles.labelSmall.copyWith(
-                              color: manager.allPlayersReady
-                                  ? AppColors.success
-                                  : AppColors.warning,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            canStart
-                                ? 'Ready to start'
-                                : players.length < 5
-                                    ? 'Need at least 5 players'
-                                    : manager.allPlayersReady
-                                        ? 'Waiting for host...'
-                                        : 'Waiting for all to be ready...',
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              color: canStart
-                                  ? AppColors.success
-                                  : AppColors.warning,
-                            ),
-                          ),
-                          if (widget.isHost && manager.hostIp != null) ...[
-                            const SizedBox(height: 8),
-                            GestureDetector(
-                              onTap: () {
-                                Clipboard.setData(
-                                    ClipboardData(text: manager.hostIp!));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('IP copied to clipboard'),
-                                    duration: Duration(seconds: 1),
-                                  ),
-                                );
-                              },
-                              child: Row(
+                              Row(
                                 children: [
-                                  const Icon(Icons.lan,
-                                      size: 14, color: AppColors.textMuted),
-                                  const SizedBox(width: 4),
-                                  Flexible(
-                                    child: Text(
-                                      'IP: ${manager.hostIp}',
-                                      overflow: TextOverflow.ellipsis,
-                                      style: AppTextStyles.labelSmall.copyWith(
-                                        color: AppColors.textMuted,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.copy,
-                                      size: 12, color: AppColors.textMuted),
-                                  const SizedBox(width: 4),
-                                  IconButton(
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                    onPressed: () {
-                                      if (manager.hostIp != null) {
-                                        _showQrDialog(manager.hostIp!);
-                                      }
-                                    },
-                                    icon: const Icon(Icons.qr_code,
-                                        size: 18, color: AppColors.primary),
+                                  const Icon(Icons.groups,
+                                      color: AppColors.primary, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${players.length} PLAYERS',
+                                    style: AppTextStyles.titleMedium,
                                   ),
                                 ],
                               ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: canStart
-                            ? AppColors.success.withOpacity(0.1)
-                            : AppColors.surface,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            canStart
-                                ? Icons.check_circle
-                                : Icons.hourglass_empty,
-                            size: 16,
-                            color: canStart
-                                ? AppColors.success
-                                : AppColors.textMuted,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            canStart ? 'READY' : 'WAITING',
-                            style: AppTextStyles.labelSmall.copyWith(
-                              color: canStart
-                                  ? AppColors.success
-                                  : AppColors.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('PLAYERS', style: AppTextStyles.labelSmall),
-                    Text(
-                      '${players.length}/${10}',
-                      style: AppTextStyles.labelSmall,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  itemCount: players.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final player = players[index];
-                    final isHost =
-                        player.id == 'host' || player.id.startsWith('host_');
-                    final isYou = player.id == localPlayerId;
-                    return PlayerCard(
-                      name: player.name,
-                      isHost: isHost,
-                      isYou: isYou,
-                      status: player.isReady
-                          ? PlayerStatus.ready
-                          : PlayerStatus.waiting,
-                      subtitle: player.isBot
-                          ? 'BOT'
-                          : (player.isReady ? 'READY' : 'NOT READY'),
-                      onTap: widget.isHost && !isYou
-                          ? () => _showKickDialog(player)
-                          : null,
-                    );
-                  },
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: widget.isHost
-                    ? PrimaryButtonLarge(
-                        label: canStart
-                            ? 'START GAME'
-                            : players.length < 5
-                                ? 'NEED ${5 - players.length} MORE'
-                                : 'WAITING FOR READY',
-                        icon: Icons.play_arrow,
-                        onPressed: canStart ? _startGame : null,
-                      )
-                    : Column(
-                        children: [
-                          PrimaryButtonLarge(
-                            label: manager.localPlayer?.isReady == true
-                                ? 'READY - TAP TO UNREADY'
-                                : 'TAP WHEN READY',
-                            icon: manager.localPlayer?.isReady == true
-                                ? Icons.check_circle
-                                : Icons.hourglass_empty,
-                            onPressed: () {
-                              final currentPlayer = manager.localPlayer;
-                              if (currentPlayer != null) {
-                                manager.setLocalPlayerReady(
-                                    !currentPlayer.isReady);
-                              }
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Waiting for host to start...',
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              color: AppColors.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ],
-          ),
-        ),
-        floatingActionButton: manager.mode == GameMode.offlineP2P
-            ? FloatingActionButton(
-                onPressed: () => _showChatPanel(context, manager),
-                backgroundColor: AppColors.primary,
-                child: Stack(
-                  children: [
-                    const Icon(Icons.chat),
-                    if (manager.lobbyChatMessages.isNotEmpty)
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: AppColors.success,
-                            shape: BoxShape.circle,
+                              const SizedBox(height: 4),
+                              Text(
+                                '${manager.readyPlayerCount}/${players.length} READY',
+                                style: AppTextStyles.labelSmall.copyWith(
+                                  color: manager.allPlayersReady
+                                      ? AppColors.success
+                                      : AppColors.warning,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                canStart
+                                    ? 'Ready to start'
+                                    : players.length < 5
+                                        ? 'Need at least 5 players'
+                                        : manager.allPlayersReady
+                                            ? 'Waiting for host...'
+                                            : 'Waiting for all to be ready...',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: canStart
+                                      ? AppColors.success
+                                      : AppColors.warning,
+                                ),
+                              ),
+                              if (widget.isHost &&
+                                  manager.hostIp != null &&
+                                  manager.hostPort != null) ...[
+                                const SizedBox(height: 8),
+                                GestureDetector(
+                                  onTap: () {
+                                    final ipPort =
+                                        '${manager.hostIp}:${manager.hostPort}';
+                                    Clipboard.setData(
+                                        ClipboardData(text: ipPort));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content:
+                                            Text('IP:PORT copied to clipboard'),
+                                        duration: Duration(seconds: 1),
+                                      ),
+                                    );
+                                  },
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.lan,
+                                          size: 14, color: AppColors.textMuted),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          'IP: ${manager.hostIp}:${manager.hostPort}',
+                                          overflow: TextOverflow.ellipsis,
+                                          style:
+                                              AppTextStyles.labelSmall.copyWith(
+                                            color: AppColors.textMuted,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.copy,
+                                          size: 12, color: AppColors.textMuted),
+                                      const SizedBox(width: 4),
+                                      IconButton(
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                        onPressed: () {
+                                          if (manager.hostIp != null &&
+                                              manager.hostPort != null) {
+                                            _showQrDialog(manager.hostIp!,
+                                                manager.hostPort!);
+                                          }
+                                        },
+                                        icon: const Icon(Icons.qr_code,
+                                            size: 18, color: AppColors.primary),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
-                      ),
-                  ],
-                ),
-              )
-            : null,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: canStart
+                                ? AppColors.success.withOpacity(0.1)
+                                : AppColors.surface,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                canStart
+                                    ? Icons.check_circle
+                                    : Icons.hourglass_empty,
+                                size: 16,
+                                color: canStart
+                                    ? AppColors.success
+                                    : AppColors.textMuted,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                canStart ? 'READY' : 'WAITING',
+                                style: AppTextStyles.labelSmall.copyWith(
+                                  color: canStart
+                                      ? AppColors.success
+                                      : AppColors.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Text('PLAYERS', style: AppTextStyles.labelSmall),
+                            // Moderator mode badge
+                            if (manager.currentRoom?.moderatorMode == true) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.warning.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: AppColors.warning.withOpacity(0.4),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.supervisor_account,
+                                        size: 10, color: AppColors.warning),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'MODERATOR',
+                                      style: AppTextStyles.labelSmall.copyWith(
+                                        color: AppColors.warning,
+                                        fontSize: 9,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        Text(
+                          '${players.length}/${manager.currentRoom?.maxPlayers ?? 10}',
+                          style: AppTextStyles.labelSmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      itemCount: players.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final player = players[index];
+                        final isHost = player.id == 'host' ||
+                            player.id.startsWith('host_');
+                        final isYou = player.id == localPlayerId;
+                        return PlayerCard(
+                          name: player.name,
+                          isHost: isHost,
+                          isYou: isYou,
+                          status: player.isReady
+                              ? PlayerStatus.ready
+                              : PlayerStatus.waiting,
+                          subtitle: player.isBot
+                              ? 'BOT'
+                              : (player.isReady ? 'READY' : 'NOT READY'),
+                          onTap: widget.isHost && !isYou
+                              ? () => _showKickDialog(player)
+                              : null,
+                        );
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: widget.isHost
+                        ? PrimaryButtonLarge(
+                            label: canStart
+                                ? 'START GAME'
+                                : players.length < 5
+                                    ? 'NEED ${5 - players.length} MORE'
+                                    : 'WAITING FOR READY',
+                            icon: Icons.play_arrow,
+                            onPressed: canStart ? _startGame : null,
+                          )
+                        : Column(
+                            children: [
+                              PrimaryButtonLarge(
+                                label: manager.localPlayer?.isReady == true
+                                    ? 'READY - TAP TO UNREADY'
+                                    : 'TAP WHEN READY',
+                                icon: manager.localPlayer?.isReady == true
+                                    ? Icons.check_circle
+                                    : Icons.hourglass_empty,
+                                onPressed: () {
+                                  final currentPlayer = manager.localPlayer;
+                                  if (currentPlayer != null) {
+                                    manager.setLocalPlayerReady(
+                                        !currentPlayer.isReady);
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Waiting for host to start...',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            floatingActionButton: manager.mode == GameMode.offlineP2P
+                ? FloatingActionButton(
+                    onPressed: () => _showChatPanel(context, manager),
+                    backgroundColor: AppColors.primary,
+                    child: Stack(
+                      children: [
+                        const Icon(Icons.chat),
+                        if (manager.lobbyChatMessages.isNotEmpty)
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: AppColors.success,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  )
+                : null,
+          ),
+          // Countdown overlay
+          if (manager.isCountingDown)
+            CountdownOverlay(
+              countdownValue: manager.countdownValue,
+            ),
+        ],
       ),
     );
   }
@@ -613,7 +693,8 @@ class _LobbyScreenNewState extends State<LobbyScreenNew> {
             },
             child: Text(
               'Leave',
-              style: TextStyle(color: const ui.Color.fromARGB(255, 165, 42, 65)),
+              style:
+                  TextStyle(color: const ui.Color.fromARGB(255, 165, 42, 65)),
             ),
           ),
         ],
@@ -737,7 +818,7 @@ class _ChatPanelState extends State<_ChatPanel> {
                 child: manager.lobbyChatMessages.isEmpty
                     ? Center(
                         child: Text(
-                          'No messages yet.\\nSay hello to your crew!',
+                          'No messages yet.\nSay hello to your crew!',
                           textAlign: TextAlign.center,
                           style: AppTextStyles.bodyMedium.copyWith(
                             color: AppColors.textMuted,

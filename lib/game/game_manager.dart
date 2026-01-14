@@ -67,6 +67,10 @@ class GameManager extends ChangeNotifier {
   String? disconnectReason;
   bool wasDisconnected = false;
 
+  // Countdown state
+  bool isCountingDown = false;
+  int countdownValue = 0;
+
   // ═══════════════════════════════════════════════════════════════════════════
   // INTERNAL STATE
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1068,6 +1072,12 @@ class GameManager extends ChangeNotifier {
     _lanComm!.onPlayerLeft = (id) {
       players.removeWhere((p) => p.id == id);
       _lanComm!.updateRoomInfo(playerCount: players.length);
+
+      // Cancel countdown if a player leaves
+      if (isCountingDown) {
+        cancelGameCountdown();
+      }
+
       _broadcastState();
       notifyListeners();
     };
@@ -1096,6 +1106,18 @@ class GameManager extends ChangeNotifier {
       // Broadcast to all clients
       _lanComm!.broadcastChatMessage(senderId, senderName, message);
       notifyListeners();
+    };
+
+    // Handle countdown messages (won't receive as host, but set for consistency)
+    _lanComm!.onCountdownReceived = (value) {
+      countdownValue = value;
+      isCountingDown = value > 0;
+      notifyListeners();
+    };
+
+    // Handle game start messages (won't receive as host, but set for consistency)
+    _lanComm!.onGameStartReceived = () {
+      // Host starts game locally, doesn't receive this
     };
 
     // Start hosting with privacy settings
@@ -1192,6 +1214,12 @@ class GameManager extends ChangeNotifier {
       // Handle disconnection with reason
       wasDisconnected = true;
       disconnectReason = reason;
+
+      // Cancel countdown if host disconnects
+      if (isCountingDown) {
+        cancelGameCountdown();
+      }
+
       notifyListeners();
     };
 
@@ -1219,6 +1247,19 @@ class GameManager extends ChangeNotifier {
       );
       lobbyChatMessages.add(chatMsg);
       notifyListeners();
+    };
+
+    // Handle countdown messages from host (clients only)
+    _lanComm!.onCountdownReceived = (value) {
+      countdownValue = value;
+      isCountingDown = value > 0;
+      notifyListeners();
+    };
+
+    // Handle game start messages from host (clients only)
+    _lanComm!.onGameStartReceived = () {
+      startGame();
+      // Navigation will be handled by lobby screen
     };
 
     // Attach receiver before joining
@@ -1272,6 +1313,12 @@ class GameManager extends ChangeNotifier {
     _lanComm!.onDisconnectedFromHost = (reason) {
       wasDisconnected = true;
       disconnectReason = reason;
+
+      // Cancel countdown if host disconnects
+      if (isCountingDown) {
+        cancelGameCountdown();
+      }
+
       notifyListeners();
     };
 
@@ -1298,6 +1345,19 @@ class GameManager extends ChangeNotifier {
       );
       lobbyChatMessages.add(chatMsg);
       notifyListeners();
+    };
+
+    // Handle countdown messages from host (clients only)
+    _lanComm!.onCountdownReceived = (value) {
+      countdownValue = value;
+      isCountingDown = value > 0;
+      notifyListeners();
+    };
+
+    // Handle game start messages from host (clients only)
+    _lanComm!.onGameStartReceived = () {
+      startGame();
+      // Navigation will be handled by lobby screen
     };
 
     attachReceiver(_lanComm!);
@@ -1352,6 +1412,103 @@ class GameManager extends ChangeNotifier {
 
   /// Get host IP address (for host only, to show to players)
   String? get hostIp => _lanComm?.currentRoom?.hostIp;
+
+  /// Get host port (for host only, to show to players)
+  int? get hostPort => _lanComm?.currentRoom?.hostPort;
+
+  /// Update room settings (host only)
+  void updateRoomSettings({
+    int? maxPlayers,
+    bool? isPrivate,
+    String? newPin,
+    bool? chatEnabled,
+    bool? moderatorMode,
+  }) {
+    if (!_isHost || _lanComm == null) return;
+
+    _lanComm!.updateRoomSettings(
+      maxPlayers: maxPlayers,
+      isPrivate: isPrivate,
+      newPin: newPin,
+      chatEnabled: chatEnabled,
+      moderatorMode: moderatorMode,
+    );
+    notifyListeners();
+  }
+
+  /// Get current room info
+  RoomInfo? get currentRoom => _lanComm?.currentRoom;
+
+  /// Start game countdown (host only)
+  Future<void> startGameCountdown() async {
+    if (!_isHost || !canStartGame || isCountingDown) return;
+
+    isCountingDown = true;
+    countdownValue = 5;
+
+    // Set countdown flag on room to prevent joins
+    if (_lanComm?.currentRoom != null) {
+      _lanComm!.currentRoom!.isCountingDown = true;
+    }
+
+    notifyListeners();
+
+    // Broadcast countdown start to all clients
+    _lanComm?.broadcastCountdown(countdownValue);
+
+    // Countdown from 5 to 1
+    for (int i = 5; i >= 1; i--) {
+      if (!isCountingDown) {
+        // Countdown was cancelled
+        if (_lanComm?.currentRoom != null) {
+          _lanComm!.currentRoom!.isCountingDown = false;
+        }
+        return;
+      }
+
+      countdownValue = i;
+      notifyListeners();
+      _lanComm?.broadcastCountdown(i);
+
+      await Future.delayed(const Duration(seconds: 1));
+    }
+
+    // Check again before starting (in case host disconnected during countdown)
+    if (!isCountingDown) {
+      if (_lanComm?.currentRoom != null) {
+        _lanComm!.currentRoom!.isCountingDown = false;
+      }
+      return;
+    }
+
+    // Countdown complete - start the game
+    isCountingDown = false;
+    countdownValue = 0;
+    if (_lanComm?.currentRoom != null) {
+      _lanComm!.currentRoom!.isCountingDown = false;
+    }
+    notifyListeners();
+
+    // Broadcast game start to all clients
+    _lanComm?.broadcastGameStart();
+
+    // Start the game
+    startGame();
+
+    // Navigate to role reveal will be handled in lobby screen
+  }
+
+  /// Cancel game countdown (host only, or on host disconnect)
+  void cancelGameCountdown() {
+    if (isCountingDown) {
+      isCountingDown = false;
+      countdownValue = 0;
+      if (_lanComm?.currentRoom != null) {
+        _lanComm!.currentRoom!.isCountingDown = false;
+      }
+      notifyListeners();
+    }
+  }
 
   @override
   void dispose() {

@@ -1,104 +1,470 @@
 # Mafia Game (Flutter)
 
-:crossed_swords: **Mafia — Offline LAN (UDP/TCP) multiplayer + Solo bots**
+🎭 **Mafia — Offline LAN Multiplayer + Solo Bots with Advanced Features**
 
-This repository contains a Flutter game that supports local offline multiplayer over LAN (UDP-based room discovery + TCP for reliable game sync) and a solo mode with AI bots.
+A fully-featured Flutter-based Mafia game supporting local offline multiplayer over LAN (UDP/TCP) and solo mode with AI bots. Features include room management, lobby chat, countdown system, and comprehensive host controls.
 
 ---
 
 ## 🔑 Key Features
 
-- **Fully offline LAN multiplayer**
-  - UDP broadcast discovery (port 41234)
-  - TCP server/client communication (dynamic ports assigned by OS)
-  - Host-authoritative: host keeps canonical game state and broadcasts state updates
-  - **Ready/Wait system**: All players must mark themselves ready before host can start
-  - **Lobby chat**: In-room text messaging before game starts
-  - **Host disconnect handling**: Clients notified and redirected when host leaves
+### **Core Gameplay**
+- **Fully offline LAN multiplayer** — No internet connection required
 - **Solo mode** with AI-controlled bots (no networking required)
-- **QR / IP-based join fallback** (scan QR or enter host IP:port to connect directly)
-- Animated in-app splash + native splash (Android/iOS)
-- Cross-platform: Android, Windows (desktop), Web (UI only — LAN not supported in browser)
+- **Classic Mafia roles** — Villager, Mafia, Doctor, Detective, and more
+- **Phase-based gameplay** — Night phase, Discussion, Voting, and Results
+- **Cross-platform support** — Android, Windows, iOS, macOS, Linux (LAN not supported in Web)
+
+### **Advanced Networking**
+- **UDP broadcast discovery** (port 41234) — Automatic room discovery on local network
+- **TCP server/client communication** — Dynamic OS-assigned ports for reliable game sync
+- **Host-authoritative architecture** — Host maintains canonical game state
+- **QR code + IP fallback** — Scan QR or enter IP:PORT to connect directly
+- **Private rooms with PIN** — 4-digit PIN protection for private games
+- **Dynamic port system** — Automatic port assignment and discovery
+
+### **Lobby Management**
+- **Ready/Wait system** — Players must ready up before host can start
+- **Lobby chat** — In-room text messaging before game starts
+- **Host powers** — Kick players, change settings, control game start
+- **Room settings panel** — Configure max players, privacy, chat, and more
+- **Player status indicators** — Visual ready/waiting states for all players
+- **Moderator mode** — UI badge and toggle (coming soon for gameplay logic)
+
+### **Game Start System**
+- **Synchronized countdown** — 5-4-3-2-1 countdown on all devices
+- **Countdown overlay** — Full-screen animated countdown with fade effects
+- **Safety rules** — Prevents game start without all players ready
+- **Disconnect protection** — Countdown cancels if host disconnects mid-countdown
+- **Join blocking** — No new players can join during countdown
+
+### **Host Disconnect Handling**
+- **In Lobby** — Clients automatically notified with reason dialog
+- **During Game** — Game immediately ends, all players returned to home
+- **Countdown cancellation** — Countdown stops if host disconnects
+- **Automatic navigation** — Back to home screen with error message
 
 ---
 
-## 🆕 Recent Updates
+## 🆕 Latest Feature Set
 
-### Ready/Wait System
-- Each player has a ready status displayed in the lobby
-- Clients tap "READY" button to toggle their ready state
-- Host can only start game when all players are ready
-- Ready count displayed: "X/Y READY"
+### **Part 1 — Host Room Settings Panel**
+Hosts can now configure their room with a comprehensive settings dialog:
+- **Max Players Slider** — Set room capacity from 5 to 20 players
+- **Public/Private Toggle** — Make room private with PIN requirement
+- **PIN Management** — Change 4-digit PIN for private rooms
+- **Chat Toggle** — Enable/disable lobby chat
+- **Moderator Mode** — Toggle moderator mode (UI only, gameplay coming soon)
+- **Characters Section** — Placeholder for future character customization
 
-### Lobby Chat
-- Floating chat button (FAB) in lobby
-- Send messages to all players before game starts
-- Messages show sender name and are styled differently for your own messages
+Access via **Settings icon** (⚙️) in lobby app bar (host only).
 
-### Host Powers
-- **Kick Players**: Host can remove players from lobby before game starts
-- **Moderator Assignment**: Assign/unassign moderator role
-- **Start Control**: Host can only start when minimum 5 players and all ready
+### **Part 2 — Moderator Mode (UI)**
+Visual indicators for moderator mode:
+- **Toggle in Settings** — Enable/disable in room settings
+- **Lobby Badge** — "MODERATOR" badge displayed next to player list
+- **Coming Soon** — Full moderator gameplay logic to be implemented
 
-### Host Disconnect Handling
-- **In Lobby**: Clients automatically notified when host disconnects, dialog shown with reason
-- **During Game**: Game immediately ends if host disconnects, all players returned to home
-- Automatic navigation back to home screen with error message
+### **Part 3 — Game Start Countdown**
+Synchronized countdown system before game starts:
+- **5-4-3-2-1 countdown** — Large animated numbers on all devices
+- **Full-screen overlay** — Semi-transparent dark background
+- **Smooth animations** — Fade and scale effects for each number
+- **Synchronized timing** — All clients show same countdown value
+- **Automatic start** — Game begins automatically after countdown completes
 
-### Game State Safety
-- **No Late Joins**: Clients attempting to join after game starts receive "Game already in progress" rejection
-- **Host Disconnect Protection**: Game cannot continue without host, all players notified immediately
+### **Part 4 — Safety Rules**
+Comprehensive safety checks to ensure fair gameplay:
+1. **Ready Check** — Host cannot start game unless ALL players are ready
+2. **Countdown Cancellation** — If host disconnects during countdown, countdown stops on all clients
+3. **Join Blocking** — New players cannot join room during countdown or after game starts
+4. **Player Leave Handling** — If any player leaves during countdown, countdown is cancelled
 
-### Dynamic TCP Ports
-- TCP server now binds to port 0 (OS-assigned dynamic port)
-- Port number included in room discovery broadcasts
-- QR codes encode full `IP:PORT` for connection
-
----
-
-## 📁 Project structure (important files)
-
-- lib/
-  - game/
-    - game_manager.dart — central game state and logic (ChangeNotifier)
-    - bot_controller.dart — bot behavior
-    - game_rules.dart — role setup & win conditions
-  - network/
-    - lan_communication.dart — UDP discovery + TCP client/server implementation
-    - game_communication.dart — interface for communication layer
-  - ui/
-    - home_screen.dart, player_setup_screen.dart, lobby_screen.dart, game_screen.dart
-    - how_to_play_screen.dart — rules and role descriptions
-  - models/
-    - player.dart — Player model with id, name, role, isReady, etc.
-    - game_state.dart — GamePhase, GameMode, GameConfig enums
-
-- assets/
-  - images/icon.png — app icon (used for launcher & splash)
-  - images/background.png
+### **Part 5 — README Documentation**
+This comprehensive README now includes:
+- Full feature list with descriptions
+- Detailed networking architecture
+- Usage instructions for all features
+- Development setup guide
+- Project structure overview
 
 ---
 
-## 🛠 Development setup
+## 📋 Detailed Feature Documentation
 
-Requirements:
+### **Networking & Discovery**
+
+#### UDP Broadcast Discovery (Port 41234)
+- Host broadcasts room info every 2 seconds
+- Clients listen for broadcasts and display available rooms
+- Room data includes: host name, room name, player count, max players, privacy status
+- Automatic cleanup of stale rooms (6-second timeout)
+
+#### TCP Communication (Dynamic Ports)
+- TCP server binds to OS-assigned dynamic port (not hardcoded)
+- Port number included in UDP broadcasts and QR codes
+- Format: `IP:PORT` (e.g., `192.168.1.100:54321`)
+- Reliable message delivery with newline-delimited JSON
+- Message buffering for partial packet handling
+
+#### Message Protocol
+The game uses JSON messages over TCP with the following types:
+- **join_request** — Client requests to join room (includes PIN if private)
+- **join_accepted** / **join_rejected** — Host response to join request
+- **state_update** — Host broadcasts game state to all clients
+- **set_ready** — Client notifies host of ready state change
+- **player_ready** — Host broadcasts ready state to all clients
+- **chat** / **chat_broadcast** — Lobby chat messages
+- **room_settings_update** — Host broadcasts room setting changes
+- **start_countdown** — Host initiates countdown with value (5-1)
+- **start_game** — Host signals game start after countdown
+- **kicked** — Host notifies player of kick
+- **room_closed** — Host notifies all clients of room closure
+
+### **Room Settings**
+
+#### Max Players (5-20)
+- Configurable via slider in room settings
+- Default: 10 players
+- Applies immediately to room
+- Displayed in lobby as "X/Y" (current/max)
+- Join requests rejected if room is full
+
+#### Public vs Private Rooms
+- **Public** — Anyone on LAN can join
+- **Private** — Requires 4-digit PIN to join
+- PIN never broadcast over network (stored only on host)
+- QR codes encode PIN for private rooms: `IP:PORT|PIN`
+- Join rejection with "Invalid PIN" message
+
+#### Chat Enable/Disable
+- Hosts can enable or disable lobby chat
+- Controlled via toggle in room settings
+- Applies immediately to all players
+- Chat FAB hidden when disabled
+
+#### Moderator Mode (UI)
+- Visual indicator only (gameplay logic coming soon)
+- Toggle in room settings
+- Badge displayed next to "PLAYERS" header
+- Yellow/warning color scheme
+
+### **Ready System**
+
+#### For Clients (Non-Host Players)
+- Start in "NOT READY" state
+- Tap large button to toggle: **"TAP WHEN READY"** ↔ **"READY - TAP TO UNREADY"**
+- Button icon changes: ⏳ → ✅
+- Ready state visible to all players
+- Cannot start game until ready
+
+#### For Host
+- Always ready by default
+- Cannot unready (host ready state locked)
+- Can only start game when:
+  - Minimum 5 players in room
+  - ALL players (including host) are ready
+- Button shows status: "START GAME", "NEED X MORE", or "WAITING FOR READY"
+
+#### Visual Indicators
+- Player cards show "READY" or "NOT READY" subtitle
+- Status badge: green checkmark (ready) or hourglass (waiting)
+- Ready count displayed: "X/Y READY" (green when all ready, yellow otherwise)
+
+### **Lobby Chat**
+
+#### Chat Interface
+- **Floating Action Button (FAB)** — Blue chat icon in bottom-right
+- **Green dot indicator** — Shows when new messages arrive
+- **Modal bottom sheet** — Slides up from bottom when opened
+- **Message list** — Scrollable with auto-scroll to latest
+- **Text input** — Bottom input field with send button
+
+#### Message Display
+- **Your messages** — Right-aligned, blue background
+- **Other messages** — Left-aligned, grey background
+- **Sender name** — Displayed above each message
+- **Timestamp** — Shown for each message
+- **Auto-formatting** — Long messages wrap properly
+
+#### Chat Features
+- Real-time message sync across all clients
+- Messages cleared when leaving room
+- Chat persists during lobby phase only
+- No message history after game starts
+
+### **Host Powers**
+
+#### Kick Players
+1. Host taps on any non-host player card in lobby
+2. Confirmation dialog appears with player name
+3. "KICK" button removes player from room
+4. Kicked player receives "kicked" message and returns to home
+5. Other clients notified of player departure
+
+#### Start Game Control
+- Only host has "START GAME" button
+- Button disabled until conditions met:
+  - Minimum 5 players
+  - All players ready
+- Tapping starts countdown sequence
+
+#### Room Settings Management
+- Host-only access via settings icon (⚙️)
+- Changes apply immediately
+- All clients notified of setting changes via **room_settings_update** message
+
+### **Countdown System**
+
+#### Countdown Flow
+1. Host taps "START GAME" when all players ready
+2. Countdown overlay appears on all devices
+3. Numbers display in sequence: 5 → 4 → 3 → 2 → 1
+4. Each number shown for 1 second
+5. After 1, game starts automatically
+6. All players navigate to role reveal screen
+
+#### Countdown Visual Design
+- **Full-screen overlay** — Dark semi-transparent background (70% opacity)
+- **Large numbers** — 120pt font size, white color
+- **Glow effect** — Shadow with primary color accent
+- **Animations** — Fade in + scale up for each number
+- **Centered** — Numbers displayed in exact center of screen
+
+#### Safety Features
+- **No joins** — Room marked as "counting down", join requests rejected
+- **Cancel on disconnect** — If host disconnects, countdown stops immediately
+- **Cancel on leave** — If any player leaves, countdown stops
+- **Can't restart** — Host can't trigger multiple countdowns simultaneously
+
+### **QR Code & Direct Join**
+
+#### QR Code Generation
+- Host can display QR code via QR icon (📱) in lobby
+- QR encodes: `IP:PORT` for public rooms, `IP:PORT|PIN` for private rooms
+- QR dialog shows:
+  - "PRIVATE ROOM" label (if private)
+  - Scannable QR code (200x200)
+  - IP:PORT text below QR
+  - PIN badge (if private)
+  - Share button to export QR as image
+
+#### Direct IP Join
+- Fallback method when UDP discovery fails
+- Format: `IP:PORT` (e.g., `192.168.1.100:54321`)
+- Optional PIN for private rooms
+- Validation: 4-digit PIN required for private rooms
+
+#### Share Functionality
+- QR code exportable as PNG image
+- Share text includes IP, port, and PIN (if private)
+- Uses system share sheet for cross-app sharing
+
+---
+
+## 📁 Project Structure
+
+```
+lib/
+├── game/
+│   ├── game_manager.dart          # Central game state (ChangeNotifier)
+│   ├── bot_controller.dart        # AI bot behavior
+│   └── game_rules.dart            # Role setup & win conditions
+├── network/
+│   ├── lan_communication.dart     # UDP discovery + TCP client/server
+│   └── game_communication.dart    # Interface for communication layer
+├── screens/
+│   ├── home_screen.dart           # Main menu
+│   ├── player_setup_screen.dart   # Name entry & mode selection
+│   ├── lobby_screen.dart          # Pre-game lobby with chat/ready/settings
+│   ├── game_screen.dart           # Main gameplay screen
+│   ├── role_reveal_screen.dart    # Role assignment reveal
+│   ├── how_to_play_screen.dart    # Rules and role descriptions
+│   └── widgets/
+│       ├── countdown_overlay.dart  # Countdown animation widget
+│       └── room_settings_dialog.dart  # Host room settings dialog
+├── models/
+│   ├── player.dart                # Player model with id, name, role, isReady
+│   └── game_state.dart            # GamePhase, GameMode, GameConfig enums
+├── theme/
+│   └── app_theme.dart             # Colors, text styles, themes
+└── main.dart                      # App entry point
+```
+
+---
+
+## 🛠 Development Setup
+
+### **Requirements**
 - Flutter 3.x/4.x SDK
+- Dart SDK (included with Flutter)
 - Android SDK (for building APK)
-- Windows tooling (if targeting desktop)
+- Xcode (for iOS, macOS builds)
+- Windows tooling (for Windows desktop)
 
-Commands:
+### **Installation**
 
-- Install dependencies
+1. **Clone repository**
+   ```bash
+   git clone <repository-url>
+   cd mafia
+   ```
 
-  ```bash
-  flutter pub get
-  ```
+2. **Install dependencies**
+   ```bash
+   flutter pub get
+   ```
 
-- Static analysis
+3. **Run on device**
+   ```bash
+   # Android
+   flutter run -d android
+   
+   # iOS
+   flutter run -d ios
+   
+   # Windows
+   flutter run -d windows
+   
+   # Web (UI only, no LAN)
+   flutter run -d chrome
+   ```
 
-  ```bash
-  flutter analyze
-  ```
+### **Build Release**
+
+```bash
+# Android APK
+flutter build apk --release
+
+# Android App Bundle
+flutter build appbundle --release
+
+# iOS
+flutter build ios --release
+
+# Windows
+flutter build windows --release
+```
+
+---
+
+## 🎮 How to Play
+
+### **Solo Mode (with Bots)**
+1. Launch app and tap "SOLO WITH BOTS"
+2. Enter your name
+3. Select number of players (5-12)
+4. Tap "START GAME"
+5. View your assigned role
+6. Play through night and day phases
+7. Vote to eliminate suspects
+8. Win as villagers or mafia!
+
+### **LAN Multiplayer Mode**
+
+#### **As Host:**
+1. Launch app and tap "HOST LAN ROOM"
+2. Enter your name and room name
+3. Optional: Enable private room and set 4-digit PIN
+4. Tap "CREATE ROOM"
+5. Share IP:PORT or QR code with other players
+6. (Optional) Open room settings (⚙️) to configure:
+   - Max players (5-20)
+   - Privacy and PIN
+   - Chat enable/disable
+   - Moderator mode
+7. Wait for players to join
+8. (Optional) Kick unwanted players by tapping their card
+9. Wait for all players to ready up
+10. Tap "START GAME" to begin countdown
+11. Game starts automatically after 5-second countdown
+
+#### **As Client:**
+1. Launch app and tap "JOIN LAN ROOM"
+2. Enter your name
+3. Choose connection method:
+   - **Auto-discover**: Select room from list
+   - **Scan QR**: Scan host's QR code
+   - **Enter IP**: Type IP:PORT manually
+4. Enter PIN if room is private
+5. Tap "JOIN"
+6. Wait in lobby and chat with other players
+7. Tap "READY" when you're ready to play
+8. Wait for host to start game
+9. Watch countdown (5-4-3-2-1)
+10. View your assigned role and play!
+
+---
+
+## 🔧 Troubleshooting
+
+### **Can't discover rooms**
+- Ensure all devices are on same WiFi network
+- Check that UDP port 41234 is not blocked by firewall
+- Try direct IP join as fallback
+
+### **Connection refused**
+- Verify host is still running the room
+- Check that IP address is correct
+- Ensure TCP port is not blocked
+
+### **Host disconnected**
+- This is normal if host closes app or loses connection
+- All clients will be notified and returned to home
+- Host must recreate room for new game
+
+### **Countdown won't start**
+- Ensure all players are ready
+- Check that minimum 5 players are in room
+- Host must tap "START GAME" button
+
+---
+
+## 📝 License
+
+This project is open source. See LICENSE file for details.
+
+---
+
+## 🙏 Credits
+
+Built with Flutter and Dart.
+
+**Network Libraries:**
+- UDP broadcast discovery
+- TCP socket communication
+- QR code generation (barcode_widget)
+- Share functionality (share_plus)
+
+**UI/UX:**
+- Custom theme with dark mode support
+- Smooth animations and transitions
+- Material Design components
+
+---
+
+## 🚀 Future Roadmap
+
+### **Coming Soon:**
+- [ ] Moderator mode gameplay logic
+- [ ] Character customization
+- [ ] Advanced role abilities
+- [ ] Game history and statistics
+- [ ] Sound effects and music
+- [ ] More AI bot personalities
+- [ ] Custom game rules
+- [ ] Spectator mode
+
+### **Under Consideration:**
+- [ ] Internet multiplayer (dedicated server)
+- [ ] Cross-platform party codes
+- [ ] Voice chat integration
+- [ ] Replay system
+- [ ] Tournament mode
+
+---
+
+**Enjoy the game! Report bugs or suggest features via GitHub Issues.**
 
 - Run (Windows desktop)
 
