@@ -11,7 +11,7 @@ class AppColors {
   static const Color textPrimary = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0xFFA0A0A0);
   static const Color textMuted = Color(0xFF666666);
-  static const Color error = Color(0xFFCF6679);
+  static const Color error = Color.fromARGB(255, 177, 16, 46);
   static const Color success = Color(0xFF4CAF50);
   static const Color warning = Color(0xFFFFB74D);
   static const Color mafia = Color(0xFF9E1B32);

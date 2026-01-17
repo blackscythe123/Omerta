@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/vote_tile.dart';
 import '../widgets/primary_button.dart';
+import '../game/game_manager.dart';
 
 enum GamePhaseType { day, night, voting, discussion }
 
@@ -17,6 +19,7 @@ class _GameScreenNewState extends State<GameScreenNew> {
   int _day = 1;
   int _timeRemaining = 90;
   String? _selectedVote;
+  bool _hasShownDisconnectDialog = false;
   final List<_PlayerVote> _players = [
     _PlayerVote('Alex', 2, false),
     _PlayerVote('Jordan', 0, false),
@@ -27,8 +30,53 @@ class _GameScreenNewState extends State<GameScreenNew> {
 
   bool get _hasVoted => _selectedVote != null;
 
+  void _showDisconnectDialog(GameManager manager) {
+    if (_hasShownDisconnectDialog) return;
+    _hasShownDisconnectDialog = true;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.card,
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppColors.error),
+            const SizedBox(width: 12),
+            const Text('GAME ENDED'),
+          ],
+        ),
+        content: Text(
+          manager.disconnectReason ?? 'Host disconnected. The game has ended.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              manager.clearDisconnectState();
+              manager.leaveLANRoom();
+              Navigator.of(ctx).pop();
+              Navigator.popUntil(context, (route) => route.isFirst);
+            },
+            child: Text('OK', style: TextStyle(color: AppColors.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final manager = context.watch<GameManager>();
+
+    // Handle host disconnect during game
+    if (manager.wasDisconnected && !manager.isHost) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_hasShownDisconnectDialog) {
+          _showDisconnectDialog(manager);
+        }
+      });
+    }
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(

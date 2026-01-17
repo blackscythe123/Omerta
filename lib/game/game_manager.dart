@@ -60,6 +60,17 @@ class GameManager extends ChangeNotifier {
   // Chat system for Solo Mode
   List<ChatMessage> chatMessages = [];
 
+  // Lobby chat messages (for LAN multiplayer)
+  List<ChatMessage> lobbyChatMessages = [];
+
+  // Host disconnect info for UI navigation
+  String? disconnectReason;
+  bool wasDisconnected = false;
+
+  // Countdown state
+  bool isCountingDown = false;
+  int countdownValue = 0;
+
   // ═══════════════════════════════════════════════════════════════════════════
   // INTERNAL STATE
   // ═══════════════════════════════════════════════════════════════════════════
@@ -258,8 +269,77 @@ class GameManager extends ChangeNotifier {
         );
   }
 
-  /// Check if we have enough players to start
-  bool get canStartGame => players.length >= 5;
+  /// Check if we have enough players and all are ready to start
+  bool get canStartGame {
+    if (players.length < 5) return false;
+    // Check if all non-host players are ready
+    return players.every((p) => p.isReady);
+  }
+
+  /// Check if all players are ready (for UI display)
+  bool get allPlayersReady => players.every((p) => p.isReady);
+
+  /// Get count of ready players
+  int get readyPlayerCount => players.where((p) => p.isReady).length;
+
+  /// Set local player ready state (client only)
+  void setLocalPlayerReady(bool isReady) {
+    if (_isHost) return; // Host is always ready
+
+    final playerIndex = players.indexWhere((p) => p.id == localPlayerId);
+    if (playerIndex >= 0) {
+      players[playerIndex] = players[playerIndex].copyWith(isReady: isReady);
+      _lanComm?.sendReadyState(isReady);
+      notifyListeners();
+    }
+  }
+
+  /// Send lobby chat message
+  void sendLobbyChatMessage(String message) {
+    if (message.trim().isEmpty) return;
+
+    final player = localPlayer;
+    if (player == null) return;
+
+    final chatMsg = ChatMessage(
+      senderId: player.id,
+      senderName: player.name,
+      text: message.trim(),
+      timestamp: DateTime.now(),
+    );
+
+    lobbyChatMessages.add(chatMsg);
+
+    if (_isHost) {
+      // Host broadcasts to all clients
+      _lanComm?.broadcastChatMessage(player.id, player.name, message.trim());
+    } else {
+      // Client sends to host
+      _lanComm?.sendChatMessage(message.trim(), player.name);
+    }
+
+    notifyListeners();
+  }
+
+  /// Clear disconnect state (called when navigating away from error)
+  void clearDisconnectState() {
+    wasDisconnected = false;
+    disconnectReason = null;
+    notifyListeners();
+  }
+
+  /// Kick a player from the room (host only)
+  void kickPlayer(String playerId) {
+    if (!_isHost || playerId == localPlayerId) return;
+
+    // Remove player from list
+    players.removeWhere((p) => p.id == playerId);
+
+    // Kick via network
+    _lanComm?.kickClient(playerId);
+
+    notifyListeners();
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GAME START
@@ -964,15 +1044,21 @@ class GameManager extends ChangeNotifier {
     final playerId = 'host_${DateTime.now().millisecondsSinceEpoch}';
     localPlayerId = playerId;
 
-    // Create local player
+    // Create local player (host is always ready)
     players = [
       Player(
         id: playerId,
         name: playerName,
         role: Role.villager,
         isBot: false,
+        isReady: true, // Host is always ready
       )
     ];
+
+    // Clear disconnect state
+    wasDisconnected = false;
+    disconnectReason = null;
+    lobbyChatMessages.clear();
 
     // Create LAN communication
     _lanComm = LANCommunication(isHost: true);
@@ -986,8 +1072,52 @@ class GameManager extends ChangeNotifier {
     _lanComm!.onPlayerLeft = (id) {
       players.removeWhere((p) => p.id == id);
       _lanComm!.updateRoomInfo(playerCount: players.length);
+
+      // Cancel countdown if a player leaves
+      if (isCountingDown) {
+        cancelGameCountdown();
+      }
+
       _broadcastState();
       notifyListeners();
+    };
+
+    // Handle ready state changes from clients
+    _lanComm!.onPlayerReadyChanged = (playerId, isReady) {
+      final playerIndex = players.indexWhere((p) => p.id == playerId);
+      if (playerIndex >= 0) {
+        players[playerIndex] = players[playerIndex].copyWith(isReady: isReady);
+        // Broadcast to all clients
+        _lanComm!.broadcastReadyState(playerId, isReady);
+        _broadcastState();
+        notifyListeners();
+      }
+    };
+
+    // Handle chat messages from clients
+    _lanComm!.onChatMessage = (senderId, senderName, message) {
+      final chatMsg = ChatMessage(
+        senderId: senderId,
+        senderName: senderName,
+        text: message,
+        timestamp: DateTime.now(),
+      );
+      lobbyChatMessages.add(chatMsg);
+      // Broadcast to all clients
+      _lanComm!.broadcastChatMessage(senderId, senderName, message);
+      notifyListeners();
+    };
+
+    // Handle countdown messages (won't receive as host, but set for consistency)
+    _lanComm!.onCountdownReceived = (value) {
+      countdownValue = value;
+      isCountingDown = value > 0;
+      notifyListeners();
+    };
+
+    // Handle game start messages (won't receive as host, but set for consistency)
+    _lanComm!.onGameStartReceived = () {
+      // Host starts game locally, doesn't receive this
     };
 
     // Start hosting with privacy settings
@@ -1058,15 +1188,21 @@ class GameManager extends ChangeNotifier {
     final playerId = 'player_${DateTime.now().millisecondsSinceEpoch}';
     localPlayerId = playerId;
 
-    // Create local player
+    // Create local player (clients start not ready)
     players = [
       Player(
         id: playerId,
         name: playerName,
         role: Role.villager,
         isBot: false,
+        isReady: false, // Clients must explicitly ready up
       )
     ];
+
+    // Clear disconnect state
+    wasDisconnected = false;
+    disconnectReason = null;
+    lobbyChatMessages.clear();
 
     // Set up LAN communication
     if (_lanComm == null) {
@@ -1074,14 +1210,56 @@ class GameManager extends ChangeNotifier {
     }
     _comm = _lanComm;
 
-    _lanComm!.onDisconnectedFromHost = () {
-      // Handle disconnection
+    _lanComm!.onDisconnectedFromHost = (reason) {
+      // Handle disconnection with reason
+      wasDisconnected = true;
+      disconnectReason = reason;
+
+      // Cancel countdown if host disconnects
+      if (isCountingDown) {
+        cancelGameCountdown();
+      }
+
       notifyListeners();
     };
 
     _lanComm!.onJoinRejected = (reason) {
       // Could store the reason for UI
       notifyListeners();
+    };
+
+    // Handle ready state broadcasts from host
+    _lanComm!.onPlayerReadyChanged = (playerId, isReady) {
+      final playerIndex = players.indexWhere((p) => p.id == playerId);
+      if (playerIndex >= 0) {
+        players[playerIndex] = players[playerIndex].copyWith(isReady: isReady);
+        notifyListeners();
+      }
+    };
+
+    // Handle chat broadcasts from host
+    _lanComm!.onChatMessage = (senderId, senderName, message) {
+      final chatMsg = ChatMessage(
+        senderId: senderId,
+        senderName: senderName,
+        text: message,
+        timestamp: DateTime.now(),
+      );
+      lobbyChatMessages.add(chatMsg);
+      notifyListeners();
+    };
+
+    // Handle countdown messages from host (clients only)
+    _lanComm!.onCountdownReceived = (value) {
+      countdownValue = value;
+      isCountingDown = value > 0;
+      notifyListeners();
+    };
+
+    // Handle game start messages from host (clients only)
+    _lanComm!.onGameStartReceived = () {
+      startGame();
+      // Navigation will be handled by lobby screen
     };
 
     // Attach receiver before joining
@@ -1112,26 +1290,74 @@ class GameManager extends ChangeNotifier {
     final playerId = 'player_${DateTime.now().millisecondsSinceEpoch}';
     localPlayerId = playerId;
 
-    // Create local player
+    // Create local player (clients start not ready)
     players = [
       Player(
         id: playerId,
         name: playerName,
         role: Role.villager,
         isBot: false,
+        isReady: false, // Clients must explicitly ready up
       )
     ];
+
+    // Clear disconnect state
+    wasDisconnected = false;
+    disconnectReason = null;
+    lobbyChatMessages.clear();
 
     // Set up LAN communication
     _lanComm = LANCommunication(isHost: false);
     _comm = _lanComm;
 
-    _lanComm!.onDisconnectedFromHost = () {
+    _lanComm!.onDisconnectedFromHost = (reason) {
+      wasDisconnected = true;
+      disconnectReason = reason;
+
+      // Cancel countdown if host disconnects
+      if (isCountingDown) {
+        cancelGameCountdown();
+      }
+
       notifyListeners();
     };
 
     _lanComm!.onJoinRejected = (reason) {
       notifyListeners();
+    };
+
+    // Handle ready state broadcasts from host
+    _lanComm!.onPlayerReadyChanged = (playerId, isReady) {
+      final playerIndex = players.indexWhere((p) => p.id == playerId);
+      if (playerIndex >= 0) {
+        players[playerIndex] = players[playerIndex].copyWith(isReady: isReady);
+        notifyListeners();
+      }
+    };
+
+    // Handle chat broadcasts from host
+    _lanComm!.onChatMessage = (senderId, senderName, message) {
+      final chatMsg = ChatMessage(
+        senderId: senderId,
+        senderName: senderName,
+        text: message,
+        timestamp: DateTime.now(),
+      );
+      lobbyChatMessages.add(chatMsg);
+      notifyListeners();
+    };
+
+    // Handle countdown messages from host (clients only)
+    _lanComm!.onCountdownReceived = (value) {
+      countdownValue = value;
+      isCountingDown = value > 0;
+      notifyListeners();
+    };
+
+    // Handle game start messages from host (clients only)
+    _lanComm!.onGameStartReceived = () {
+      startGame();
+      // Navigation will be handled by lobby screen
     };
 
     attachReceiver(_lanComm!);
@@ -1186,6 +1412,103 @@ class GameManager extends ChangeNotifier {
 
   /// Get host IP address (for host only, to show to players)
   String? get hostIp => _lanComm?.currentRoom?.hostIp;
+
+  /// Get host port (for host only, to show to players)
+  int? get hostPort => _lanComm?.currentRoom?.hostPort;
+
+  /// Update room settings (host only)
+  void updateRoomSettings({
+    int? maxPlayers,
+    bool? isPrivate,
+    String? newPin,
+    bool? chatEnabled,
+    bool? moderatorMode,
+  }) {
+    if (!_isHost || _lanComm == null) return;
+
+    _lanComm!.updateRoomSettings(
+      maxPlayers: maxPlayers,
+      isPrivate: isPrivate,
+      newPin: newPin,
+      chatEnabled: chatEnabled,
+      moderatorMode: moderatorMode,
+    );
+    notifyListeners();
+  }
+
+  /// Get current room info
+  RoomInfo? get currentRoom => _lanComm?.currentRoom;
+
+  /// Start game countdown (host only)
+  Future<void> startGameCountdown() async {
+    if (!_isHost || !canStartGame || isCountingDown) return;
+
+    isCountingDown = true;
+    countdownValue = 5;
+
+    // Set countdown flag on room to prevent joins
+    if (_lanComm?.currentRoom != null) {
+      _lanComm!.currentRoom!.isCountingDown = true;
+    }
+
+    notifyListeners();
+
+    // Broadcast countdown start to all clients
+    _lanComm?.broadcastCountdown(countdownValue);
+
+    // Countdown from 5 to 1
+    for (int i = 5; i >= 1; i--) {
+      if (!isCountingDown) {
+        // Countdown was cancelled
+        if (_lanComm?.currentRoom != null) {
+          _lanComm!.currentRoom!.isCountingDown = false;
+        }
+        return;
+      }
+
+      countdownValue = i;
+      notifyListeners();
+      _lanComm?.broadcastCountdown(i);
+
+      await Future.delayed(const Duration(seconds: 1));
+    }
+
+    // Check again before starting (in case host disconnected during countdown)
+    if (!isCountingDown) {
+      if (_lanComm?.currentRoom != null) {
+        _lanComm!.currentRoom!.isCountingDown = false;
+      }
+      return;
+    }
+
+    // Countdown complete - start the game
+    isCountingDown = false;
+    countdownValue = 0;
+    if (_lanComm?.currentRoom != null) {
+      _lanComm!.currentRoom!.isCountingDown = false;
+    }
+    notifyListeners();
+
+    // Broadcast game start to all clients
+    _lanComm?.broadcastGameStart();
+
+    // Start the game
+    startGame();
+
+    // Navigate to role reveal will be handled in lobby screen
+  }
+
+  /// Cancel game countdown (host only, or on host disconnect)
+  void cancelGameCountdown() {
+    if (isCountingDown) {
+      isCountingDown = false;
+      countdownValue = 0;
+      if (_lanComm?.currentRoom != null) {
+        _lanComm!.currentRoom!.isCountingDown = false;
+      }
+      notifyListeners();
+    }
+  }
 
   @override
   void dispose() {

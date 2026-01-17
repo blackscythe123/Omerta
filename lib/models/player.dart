@@ -26,6 +26,7 @@ class Player {
   final bool isBot;
   final BotPersonality? personality;
   int bullets; // Specifically for the Vigilante role
+  bool isReady; // Ready state for lobby (true = ready to start)
 
   Player({
     required this.id,
@@ -35,6 +36,7 @@ class Player {
     required this.isBot,
     this.personality,
     this.bullets = 0,
+    this.isReady = false,
   });
 
   Player copyWith({
@@ -45,6 +47,7 @@ class Player {
     bool? isBot,
     BotPersonality? personality,
     int? bullets,
+    bool? isReady,
   }) {
     return Player(
       id: id ?? this.id,
@@ -54,6 +57,7 @@ class Player {
       isBot: isBot ?? this.isBot,
       personality: personality ?? this.personality,
       bullets: bullets ?? this.bullets,
+      isReady: isReady ?? this.isReady,
     );
   }
 
@@ -69,6 +73,7 @@ class Player {
           : BotPersonality.values
               .firstWhere((p) => p.name == (json['personality'] as String)),
       bullets: json['bullets'] as int? ?? 0,
+      isReady: json['isReady'] as bool? ?? false,
     );
   }
 
@@ -81,6 +86,7 @@ class Player {
       'isBot': isBot,
       'personality': personality?.name,
       'bullets': bullets,
+      'isReady': isReady,
     };
   }
 }
