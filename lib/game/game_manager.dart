@@ -412,10 +412,29 @@ class GameManager extends ChangeNotifier {
 
   /// Handle night action from a player
   void handleNightAction(String actorId, String targetId) {
-    if (phase != GamePhase.night) return;
+    print(
+        '[GameManager] handleNightAction called: actor=$actorId target=$targetId phase=$phase');
+    if (phase != GamePhase.night) {
+      print('[GameManager] handleNightAction blocked: not in night phase');
+      return;
+    }
 
     final actor = _findPlayer(actorId);
-    if (actor == null || !actor.isAlive) return;
+    if (actor == null) {
+      print('[GameManager] handleNightAction blocked: actor not found');
+      return;
+    }
+    if (!actor.isAlive) {
+      print('[GameManager] handleNightAction blocked: actor is dead');
+      return;
+    }
+
+    // Prevent duplicate actions within same night
+    if (_nightActionsCompleted.contains(actorId)) {
+      print(
+          '[GameManager] handleNightAction ignored: actor already acted this night');
+      return;
+    }
 
     switch (actor.role) {
       case Role.mafia:
@@ -466,6 +485,8 @@ class GameManager extends ChangeNotifier {
 
     // If client, send action to host
     if (!_isHost && _comm != null) {
+      print(
+          '[GameManager] sending nightAction to host: actor=$actorId target=$targetId');
       _comm!.sendAction({
         'type': 'nightAction',
         'actorId': actorId,
@@ -486,15 +507,25 @@ class GameManager extends ChangeNotifier {
 
   /// Submit a mafia vote for who to kill
   void submitMafiaVote(String mafiaId, String targetId) {
-    if (phase != GamePhase.night) return;
+    print(
+        '[GameManager] submitMafiaVote: mafia=$mafiaId target=$targetId phase=$phase');
+    if (phase != GamePhase.night) {
+      print('[GameManager] submitMafiaVote blocked: not in night phase');
+      return;
+    }
 
     final mafia = _findPlayer(mafiaId);
     if (mafia == null ||
         !mafia.isAlive ||
-        (mafia.role != Role.mafia && mafia.role != Role.godfather)) return;
+        (mafia.role != Role.mafia && mafia.role != Role.godfather)) {
+      print('[GameManager] submitMafiaVote blocked: invalid mafia actor');
+      return;
+    }
 
     mafiaNightVotes[mafiaId] = targetId;
     _nightActionsCompleted.add(mafiaId);
+
+    print('[GameManager] mafiaNightVotes: ${mafiaNightVotes}');
 
     // Check for mafia consensus
     _checkMafiaConsensus();
@@ -517,6 +548,8 @@ class GameManager extends ChangeNotifier {
       voteCounts[vote] = (voteCounts[vote] ?? 0) + 1;
     }
 
+    print('[GameManager] _checkMafiaConsensus votes=$voteCounts');
+
     // Find target with majority or most votes
     if (voteCounts.isEmpty) {
       mafiaConsensusTarget = null;
@@ -537,6 +570,10 @@ class GameManager extends ChangeNotifier {
       // Pick the first one (could randomize ties)
       mafiaConsensusTarget = topTargets.first;
       _nightPendingKill = mafiaConsensusTarget;
+      print('[GameManager] Mafia consensus reached: $_nightPendingKill');
+    } else {
+      print(
+          '[GameManager] No consensus yet: allMafiaVoted=$allMafiaVoted topTargets=$topTargets');
     }
   }
 
@@ -567,6 +604,60 @@ class GameManager extends ChangeNotifier {
     return _nightActionsCompleted.contains(localPlayerId);
   }
 
+  /// Client-side request to ask host to restart the match (will be ignored on host)
+  void requestRestart() {
+    if (_isHost) return;
+    if (_comm != null) {
+      _comm!.sendAction({'type': 'request_restart', 'playerId': localPlayerId});
+    }
+  }
+
+  /// Host-side restart the match, keeping players & room settings but returning to lobby
+  void restartGame() {
+    // Clear game-specific state but keep players and current room
+    gameOver = false;
+    winningTeam = null;
+    phase = GamePhase.lobby;
+
+    // Reset day counter
+    currentDay = 1;
+
+    // Clear voting/night state
+    votes.clear();
+    playerVotes.clear();
+    mafiaNightVotes.clear();
+    mafiaConsensusTarget = null;
+    lastEliminatedPlayerId = null;
+    lastEliminatedRole = null;
+    nightKillTargetId = null;
+    nightKillSaved = null;
+    lastInspectedPlayerId = null;
+    lastInspectionResult = null;
+    _nightPendingKill = null;
+    _nightSavedId = null;
+    _nightVigilanteTarget = null;
+    _nightSerialKillerTarget = null;
+    _nightEscortBlocks.clear();
+    _nightActionsCompleted.clear();
+    _lastRoundVoters.clear();
+    _phaseTimer?.cancel();
+    _countdownTimer?.cancel();
+    _phaseTimer = null;
+    _countdownTimer = null;
+
+    // Players are returned to not-ready state (they may re-ready in lobby)
+    players =
+        players.map((p) => p.copyWith(isReady: false, isAlive: true)).toList();
+
+    // If host, mark room as not in progress and notify clients
+    if (_isHost && _lanComm != null) {
+      _lanComm!.updateRoomInfo(inProgress: false);
+      _broadcastState();
+    }
+
+    notifyListeners();
+  }
+
   void _checkNightComplete() {
     // Check if all alive special roles have acted
     final specialRoles =
@@ -595,10 +686,22 @@ class GameManager extends ChangeNotifier {
   // ═══════════════════════════════════════════════════════════════════════════
 
   void castVote(String voterId, String targetId) {
-    if (phase != GamePhase.voting) return;
+    print(
+        '[GameManager] castVote called: voter=$voterId target=$targetId phase=$phase');
+    if (phase != GamePhase.voting) {
+      print('[GameManager] castVote blocked: not in voting phase');
+      return;
+    }
 
     final voter = _findPlayer(voterId);
-    if (voter == null || !voter.isAlive) return;
+    if (voter == null) {
+      print('[GameManager] castVote blocked: voter not found');
+      return;
+    }
+    if (!voter.isAlive) {
+      print('[GameManager] castVote blocked: voter is dead');
+      return;
+    }
 
     // Remove prior vote by this voter
     final priorTarget = playerVotes[voterId];
@@ -851,25 +954,45 @@ class GameManager extends ChangeNotifier {
     // If a role is blocked, their action doesn't count.
 
     // 2. Mafia Kill
-    if (_nightPendingKill != null &&
-        !blockedTargets.contains(_findMafiaCaller())) {
-      if (_nightPendingKill != savedId) {
-        killedIds.add(_nightPendingKill!);
-        nightKillTargetId = _nightPendingKill;
-        nightKillSaved = false;
+    print(
+        '[GameManager] _resolveNightActions: pendingKill=$_nightPendingKill savedId=$savedId blockedTargets=$blockedTargets');
+    if (_nightPendingKill != null) {
+      // Mafia kill only proceeds if the mafia consensus exists and attacker(s) not all blocked
+      final mafiaCallerBlocked =
+          aliveMafia().every((m) => blockedTargets.contains(m.id));
+      if (!mafiaCallerBlocked) {
+        if (_nightPendingKill != savedId) {
+          killedIds.add(_nightPendingKill!);
+          nightKillTargetId = _nightPendingKill;
+          nightKillSaved = false;
+          print('[GameManager] Mafia kill scheduled: ${_nightPendingKill}');
+        } else {
+          nightKillSaved = true;
+          print('[GameManager] Mafia kill saved by doctor');
+        }
       } else {
-        nightKillSaved = true;
+        print('[GameManager] Mafia kill blocked (all mafia blocked)');
       }
     }
 
     // 3. Vigilante Kill
     if (_nightVigilanteTarget != null) {
-      final vigilante =
-          players.firstWhere((p) => p.role == Role.vigilante && p.isAlive);
-      if (!blockedTargets.contains(vigilante.id)) {
-        if (_nightVigilanteTarget != savedId) {
-          killedIds.add(_nightVigilanteTarget!);
+      try {
+        final vigilante =
+            players.firstWhere((p) => p.role == Role.vigilante && p.isAlive);
+        if (!blockedTargets.contains(vigilante.id)) {
+          if (_nightVigilanteTarget != savedId) {
+            killedIds.add(_nightVigilanteTarget!);
+            print(
+                '[GameManager] Vigilante kill scheduled: ${_nightVigilanteTarget}');
+          } else {
+            print('[GameManager] Vigilante kill saved by doctor');
+          }
+        } else {
+          print('[GameManager] Vigilante blocked by escort');
         }
+      } catch (_) {
+        // no vigilante alive
       }
     }
 
@@ -890,6 +1013,7 @@ class GameManager extends ChangeNotifier {
       final victim = _findPlayer(id);
       if (victim != null) {
         victim.isAlive = false;
+        print('[GameManager] Player eliminated: ${victim.id} (${victim.name})');
       }
     }
 
@@ -899,6 +1023,8 @@ class GameManager extends ChangeNotifier {
     _nightSerialKillerTarget = null;
     _nightEscortBlocks.clear();
     checkWinCondition();
+    print(
+        '[GameManager] After resolution: alive=${alivePlayers.map((p) => p.id)}');
   }
 
   String? _findMafiaCaller() {
@@ -1122,6 +1248,12 @@ class GameManager extends ChangeNotifier {
         break;
       case 'nightAction':
         handleNightAction(action['actorId'], action['targetId']);
+        break;
+      case 'request_restart':
+        // A client asked the host to restart the match
+        if (isHost) {
+          restartGame();
+        }
         break;
     }
   }
@@ -1360,6 +1492,12 @@ class GameManager extends ChangeNotifier {
       Future.microtask(() => notifyListeners());
     };
 
+    // Immediately remove rooms when the host broadcasts a closure
+    _lanComm!.onRoomClosed = (hostId) {
+      _discoveredRooms.removeWhere((r) => r.hostId == hostId);
+      Future.microtask(() => notifyListeners());
+    };
+
     await _lanComm!.startDiscovery();
   }
 
@@ -1575,11 +1713,25 @@ class GameManager extends ChangeNotifier {
     return true;
   }
 
+  bool _preserveRoomOnDispose = false;
+
+  /// Preserve the hosted room when the current UI is disposed (useful for host restart -> lobby navigation).
+  void preserveRoomForNextDispose() {
+    _preserveRoomOnDispose = true;
+  }
+
   /// Leave LAN room (client)
   Future<void> leaveLANRoom() async {
     if (_lanComm != null) {
       if (_isHost) {
-        await _lanComm!.stopHosting();
+        if (_preserveRoomOnDispose) {
+          // Consume the flag and keep hosting active (restart flow).
+          _preserveRoomOnDispose = false;
+          notifyListeners();
+          return;
+        } else {
+          await _lanComm!.stopHosting();
+        }
       } else {
         await _lanComm!.leaveRoom();
       }

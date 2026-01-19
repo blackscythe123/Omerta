@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'game_over_screen.dart';
 import '../theme/app_theme.dart';
+import '_mafia_panel.dart';
 import '../widgets/vote_tile.dart';
 import '../widgets/primary_button.dart';
 import '../game/game_manager.dart';
@@ -25,6 +27,9 @@ class _GameScreenNewState extends State<GameScreenNew> {
 
   // Cached reference to avoid calling Provider.of in dispose (unsafe).
   GameManager? _managerRef;
+
+  // Navigation guard for end-of-game
+  bool _hasNavigatedToGameOver = false;
 
   void _showDisconnectDialog(GameManager manager) {
     if (_hasShownDisconnectDialog) return;
@@ -144,6 +149,55 @@ class _GameScreenNewState extends State<GameScreenNew> {
         if (mounted && !_hasShownDisconnectDialog) {
           _showDisconnectDialog(manager);
         }
+      });
+    }
+
+    // Always log UI state for easier debugging
+    print(
+        '[UI] GameScreen - phase=${manager.phase} day=${manager.currentDay} alive=${manager.alivePlayers.map((p) => p.id).toList()} eliminated=${manager.players.where((p) => !p.isAlive).map((p) => p.id).toList()}');
+
+    // If the game ended, navigate to Game Over screen once
+    if (manager.gameOver && !_hasNavigatedToGameOver) {
+      _hasNavigatedToGameOver = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        // Map winningTeam to enum
+        WinningTeam winnerEnum = WinningTeam.town;
+        if (manager.winningTeam == 'mafia') winnerEnum = WinningTeam.mafia;
+        if (manager.winningTeam == 'serial_killer')
+          winnerEnum = WinningTeam.serialKiller;
+
+        // Player role string for display
+        final roleName = manager.localPlayer?.role.name;
+
+        // Determine if local player won
+        bool didWin = false;
+        final localRole = manager.localPlayer?.role;
+        if (manager.winningTeam == 'mafia') {
+          didWin = localRole == Role.mafia || localRole == Role.godfather;
+        } else if (manager.winningTeam == 'villagers') {
+          didWin = localRole != Role.mafia &&
+              localRole != Role.godfather &&
+              localRole != Role.serialKiller;
+        } else if (manager.winningTeam == 'serial_killer') {
+          didWin = localRole == Role.serialKiller;
+        }
+
+        // Try to dismiss any potential modals (dialogs/bottom sheets) before navigating
+        try {
+          if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+        } catch (_) {}
+
+        // Replace current screen with GameOver to avoid being stuck on result overlay
+        Navigator.pushReplacementNamed(
+          context,
+          '/game-over',
+          arguments: {
+            'winner': winnerEnum,
+            'playerRole': roleName,
+            'didWin': didWin,
+          },
+        );
       });
     }
 
@@ -341,21 +395,60 @@ class _GameScreenNewState extends State<GameScreenNew> {
     final manager = context.watch<GameManager>();
     final eliminatedId = manager.lastEliminatedPlayerId;
 
+    // Determine emotion: smile if opposition eliminated, sad if same team.
+    IconData icon = Icons.sentiment_satisfied;
+    Color iconColor = AppColors.primary;
+    String prefix = '';
+    if (eliminatedId != null) {
+      final local = manager.localPlayer;
+      Player? eliminatedPlayer;
+      try {
+        eliminatedPlayer =
+            manager.players.firstWhere((p) => p.id == eliminatedId);
+      } catch (_) {
+        eliminatedPlayer = null;
+      }
+
+      bool sameTeam = false;
+      if (local != null && eliminatedPlayer != null) {
+        bool localIsMafia =
+            local.role == Role.mafia || local.role == Role.godfather;
+        bool localIsSK = local.role == Role.serialKiller;
+        bool elimIsMafia = eliminatedPlayer.role == Role.mafia ||
+            eliminatedPlayer.role == Role.godfather;
+        bool elimIsSK = eliminatedPlayer.role == Role.serialKiller;
+
+        if ((localIsMafia && elimIsMafia) ||
+            (localIsSK && elimIsSK) ||
+            (!localIsMafia && !localIsSK && !elimIsMafia && !elimIsSK)) {
+          sameTeam = true;
+        }
+      }
+
+      if (sameTeam) {
+        icon = Icons.sentiment_very_dissatisfied;
+        iconColor = AppColors.error;
+        prefix = '😞 ';
+      } else {
+        icon = Icons.sentiment_satisfied;
+        iconColor = AppColors.secondary;
+        prefix = '😊 ';
+      }
+    }
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            eliminatedId != null
-                ? Icons.sentiment_very_dissatisfied
-                : Icons.sentiment_satisfied,
+            icon,
             size: 80,
-            color: eliminatedId != null ? AppColors.error : AppColors.primary,
+            color: iconColor,
           ),
           const SizedBox(height: 24),
           Text(
             eliminatedId != null
-                ? '${manager.getPlayerName(eliminatedId)} was eliminated'
+                ? '$prefix${manager.getPlayerName(eliminatedId)} was eliminated'
                 : 'No one was eliminated',
             style: AppTextStyles.displayMedium,
           ),
@@ -493,25 +586,64 @@ class _GameScreenNewState extends State<GameScreenNew> {
     final manager = context.watch<GameManager>();
     final localId = manager.localPlayerId;
     final alivePlayers = manager.players.where((p) => p.isAlive).toList();
+    final eliminatedPlayers = manager.players.where((p) => !p.isAlive).toList();
 
-    return ListView.separated(
+    return ListView(
       padding: const EdgeInsets.all(24),
-      itemCount: alivePlayers.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final player = alivePlayers[index];
-        return VoteTile(
-          playerName: player.name,
-          voteCount: manager.getVoteCount(player.id),
-          isSelected: manager.getUserVote(localId ?? '') == player.id,
-          isEliminated: !player.isAlive,
-          onVote: () {
-            if (localId != null && player.id != localId) {
-              manager.castVote(localId, player.id);
-            }
-          },
-        );
-      },
+      children: [
+        if (eliminatedPlayers.isNotEmpty) ...[
+          Text('ELIMINATED',
+              style: AppTextStyles.labelSmall
+                  .copyWith(color: AppColors.textMuted)),
+          const SizedBox(height: 8),
+          Column(
+            children: eliminatedPlayers.map((p) {
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppColors.surface,
+                  child: Text(p.name.substring(0, 1).toUpperCase(),
+                      style: AppTextStyles.labelSmall),
+                ),
+                title: Text(p.name,
+                    style: AppTextStyles.bodyLarge
+                        .copyWith(color: AppColors.textMuted)),
+                trailing: Chip(
+                    label: Text('ELIMINATED',
+                        style: TextStyle(color: AppColors.error))),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+          const Divider(),
+          const SizedBox(height: 12),
+        ],
+        ...List.generate(alivePlayers.length, (index) {
+          final player = alivePlayers[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: VoteTile(
+              playerName: player.name,
+              voteCount: manager.getVoteCount(player.id),
+              isSelected: manager.getUserVote(localId ?? '') == player.id,
+              isEliminated: !player.isAlive,
+              onVote: () {
+                final local = manager.localPlayer;
+                if (local == null) return;
+                if (!local.isAlive) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('You are eliminated and cannot vote')));
+                  return;
+                }
+                if (localId != null && player.id != localId) {
+                  manager.castVote(localId, player.id);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Vote submitted')));
+                }
+              },
+            ),
+          );
+        }),
+      ],
     );
   }
 
@@ -603,6 +735,7 @@ class _GameScreenNewState extends State<GameScreenNew> {
     List<Player> targets;
     if (local.role == Role.mafia || local.role == Role.godfather) {
       // Show a dedicated mafia vote panel with live counts and team chat
+      print('[UI] Opening mafia panel for ${local.id}');
       await _showMafiaVotePanel(manager, local);
       return;
     } else if (local.role == Role.serialKiller) {
@@ -633,22 +766,86 @@ class _GameScreenNewState extends State<GameScreenNew> {
       return;
     }
 
-    final choice = await showDialog<String?>(
+    // If player already acted, show message
+    if (manager.hasCompletedNightAction()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You have already acted this night')));
+      return;
+    }
+
+    final choice = await showModalBottomSheet<String?>(
       context: context,
-      builder: (ctx) => SimpleDialog(
-        title: const Text('Choose target'),
-        children: targets
-            .map((t) => SimpleDialogOption(
-                  onPressed: () => Navigator.of(ctx).pop(t.id),
-                  child: Text(t.name),
-                ))
-            .toList(),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        builder: (ctx, sc) => Container(
+          // Log that we're presenting the target list for debugging
+          // (shows which role is choosing and their id)
+          child: Builder(builder: (_) {
+            print(
+                '[UI] Showing night target list for ${local.role} (actor=${local.id})');
+            return Container(
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.cardBorder),
+              ),
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Choose Target',
+                          style: AppTextStyles.headlineMedium),
+                      IconButton(
+                        icon: Icon(Icons.close, color: AppColors.textMuted),
+                        onPressed: () => Navigator.of(ctx).pop(null),
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: ListView.separated(
+                      controller: sc,
+                      itemCount: targets.length,
+                      separatorBuilder: (_, __) => const Divider(),
+                      itemBuilder: (context, index) {
+                        final t = targets[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.surface,
+                            child: Text(t.name.substring(0, 1).toUpperCase(),
+                                style: AppTextStyles.labelSmall),
+                          ),
+                          title: Text(t.name, style: AppTextStyles.bodyLarge),
+                          onTap: () => Navigator.of(ctx).pop(t.id),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ),
       ),
     );
 
     if (choice == null) return;
 
     manager.handleNightAction(local.id, choice);
+
+    // Show immediate confirmation or failure
+    if (manager.hasCompletedNightAction()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Night action submitted')));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Night action not accepted')));
+    }
 
     // Immediate feedback for local roles on host (solo) - else host will broadcast results
     if (local.role == Role.detective) {
@@ -689,119 +886,21 @@ class _GameScreenNewState extends State<GameScreenNew> {
   }
 
   Future<void> _showMafiaVotePanel(GameManager manager, Player local) async {
-    final msgController = TextEditingController();
-
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => DraggableScrollableSheet(
         expand: false,
-        builder: (context, scrollController) => Container(
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.cardBorder),
-          ),
-          padding: const EdgeInsets.all(12),
-          child: AnimatedBuilder(
-            animation: manager,
-            builder: (context, _) {
-              final targets = manager.players
-                  .where((p) =>
-                      p.isAlive &&
-                      p.role != Role.mafia &&
-                      p.role != Role.godfather)
-                  .toList();
-              final teamMsgs = manager.teamChatMessages['mafia'] ?? [];
-              final myVote = manager.getMafiaVote(local.id);
-
-              return Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Mafia Vote', style: AppTextStyles.headlineMedium),
-                      IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Icons.close)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: ListView(
-                            controller: scrollController,
-                            children: targets
-                                .map((t) => ListTile(
-                                      title: Text(t.name),
-                                      trailing: Text(
-                                          '${manager.getMafiaVoteCount(t.id)}'),
-                                      selected: myVote == t.id,
-                                      onTap: () {
-                                        manager.submitMafiaVote(local.id, t.id);
-                                      },
-                                    ))
-                                .toList(),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 1,
-                          child: Column(
-                            children: [
-                              Expanded(
-                                child: ListView(
-                                  children: teamMsgs
-                                      .map((m) => ListTile(
-                                            dense: true,
-                                            title: Text(m.senderName),
-                                            subtitle: Text(m.text),
-                                          ))
-                                      .toList(),
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: msgController,
-                                      decoration: const InputDecoration(
-                                          hintText: 'Mafia chat'),
-                                      onSubmitted: (v) {
-                                        if (v.trim().isNotEmpty) {
-                                          manager.sendTeamChat(
-                                              'mafia', v.trim());
-                                          msgController.clear();
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.send),
-                                    onPressed: () {
-                                      final v = msgController.text.trim();
-                                      if (v.isNotEmpty) {
-                                        manager.sendTeamChat('mafia', v);
-                                        msgController.clear();
-                                      }
-                                    },
-                                  )
-                                ],
-                              ),
-                            ],
-                          ),
-                        )
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
+        builder: (context, scrollController) => MafiaVotePanel(
+          manager: manager,
+          local: local,
+          onVote: (targetId) {
+            manager.submitMafiaVote(local.id, targetId);
+          },
+          onSendMessage: (msg) {
+            manager.sendTeamChat('mafia', msg);
+          },
         ),
       ),
     );

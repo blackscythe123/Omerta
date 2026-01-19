@@ -141,6 +141,8 @@ class LANCommunication implements GameCommunication {
   Function(GameState)? _onGameState;
   Function(Map<String, dynamic>)? _onAction;
   Function(RoomInfo)? onRoomDiscovered;
+  Function(String)?
+      onRoomClosed; // Notifies immediate room removal when host stops
   Function(String playerId, String playerName)? onPlayerJoined;
   Function(String playerId)? onPlayerLeft;
   Function(String reason)? onDisconnectedFromHost; // Now includes reason
@@ -236,9 +238,37 @@ class LANCommunication implements GameCommunication {
 
     try {
       // Start TCP server first
-      _tcpServer = await ServerSocket.bind(InternetAddress.anyIPv4, tcpPort);
-      print('[LAN] TCP server started on port $tcpPort');
+      // Try binding to the configured tcpPort, but fall back to nearby ports
+      // and finally to an ephemeral port (0) if needed. Use `shared: true`
+      // on ServerSocket.bind to avoid Windows bind errors when a port is in use.
+      ServerSocket? server;
+      int chosenPort = tcpPort;
+      final portsToTry = <int>[tcpPort]
+        ..addAll(List.generate(10, (i) => tcpPort + i + 1))
+        ..add(0);
 
+      for (final p in portsToTry) {
+        try {
+          server = await ServerSocket.bind(
+            InternetAddress.anyIPv4,
+            p,
+            shared:
+                true, // required on Windows when re-binding same (addr,port)
+          );
+          chosenPort = server.port;
+          print('[LAN] TCP server bound to port $chosenPort (requested $p)');
+          break;
+        } catch (e) {
+          print('[LAN] TCP bind failed for port $p: $e');
+          // Try next port
+        }
+      }
+
+      if (server == null) {
+        throw SocketException('Failed to bind TCP server on any port');
+      }
+
+      _tcpServer = server;
       _tcpServer!.listen(
         _handleClientConnection,
         onError: (e) => print('[LAN] TCP server error: $e'),
@@ -257,7 +287,7 @@ class LANCommunication implements GameCommunication {
         hostName: playerName,
         roomName: roomName,
         hostIp: localIp,
-        hostPort: tcpPort,
+        hostPort: _tcpServer!.port,
         playerCount: 1,
         isPrivate: isPrivate,
       );
@@ -592,6 +622,30 @@ class LANCommunication implements GameCommunication {
   }
 
   Future<void> stopHosting() async {
+    // Send a final UDP message to signal immediate room closure to discovery listeners
+    if (_udpSocket != null && _currentRoom != null) {
+      try {
+        final data = utf8.encode(jsonEncode({
+          'type': 'room_closed',
+          'hostId': _currentRoom!.hostId,
+        }));
+        final broadcastAddresses = [
+          '255.255.255.255',
+          _getSubnetBroadcast(_currentRoom!.hostIp),
+        ];
+        for (final addr in broadcastAddresses) {
+          if (addr.isNotEmpty) {
+            try {
+              _udpSocket!.send(Uint8List.fromList(data), InternetAddress(addr),
+                  udpBroadcastPort);
+            } catch (_) {}
+          }
+        }
+      } catch (e) {
+        print('[LAN] Error sending final room_closed broadcast: $e');
+      }
+    }
+
     _broadcastTimer?.cancel();
     _broadcastTimer = null;
 
@@ -660,7 +714,9 @@ class LANCommunication implements GameCommunication {
       final message =
           jsonDecode(utf8.decode(datagram.data)) as Map<String, dynamic>;
 
-      if (message['type'] == 'room_broadcast') {
+      final type = message['type'] as String?;
+
+      if (type == 'room_broadcast') {
         final room = RoomInfo.fromJson(message['room'] as Map<String, dynamic>);
 
         final isNew = !_discoveredRooms.containsKey(room.hostId);
@@ -669,6 +725,13 @@ class LANCommunication implements GameCommunication {
 
         if (isNew || _discoveredRooms[room.hostId] != room) {
           onRoomDiscovered?.call(room);
+        }
+      } else if (type == 'room_closed') {
+        final hostId = message['hostId'] as String?;
+        if (hostId != null) {
+          _discoveredRooms.remove(hostId);
+          _roomLastSeen.remove(hostId);
+          onRoomClosed?.call(hostId);
         }
       }
     } catch (e) {

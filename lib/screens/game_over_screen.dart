@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/primary_button.dart';
+import '../game/game_manager.dart';
 
 enum WinningTeam { mafia, town, serialKiller }
 
@@ -173,16 +175,62 @@ class GameOverScreen extends StatelessWidget {
                   label: 'PLAY AGAIN',
                   icon: Icons.replay,
                   onPressed: () {
-                    Navigator.pushNamedAndRemoveUntil(
-                      context,
-                      '/',
-                      (route) => false,
-                    );
+                    final manager =
+                        Provider.of<GameManager>(context, listen: false);
+                    // If connected via LAN, try to restart in-place
+                    if (manager.isLANConnected) {
+                      if (manager.isHost) {
+                        // Preserve hosting when we navigate back to the lobby for a restart
+                        manager.preserveRoomForNextDispose();
+                        manager.restartGame();
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          '/lobby',
+                          (route) => false,
+                          arguments: {
+                            'name': manager.localPlayer?.name ?? 'Player',
+                            'isHost': true,
+                            'roomName': manager.currentRoom?.roomName,
+                          },
+                        );
+                      } else {
+                        manager.requestRestart();
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          '/lobby',
+                          (route) => false,
+                          arguments: {
+                            'name': manager.localPlayer?.name ?? 'Player',
+                            'isHost': false,
+                            'roomName': manager.currentRoom?.roomName,
+                          },
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Requested restart from host')));
+                      }
+                    } else {
+                      // Offline: just restart locally and go to lobby
+                      manager.restartGame();
+                      Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        '/lobby',
+                        (route) => false,
+                        arguments: {
+                          'name': manager.localPlayer?.name ?? 'Player',
+                          'isHost': true,
+                          'roomName': null,
+                        },
+                      );
+                    }
                   },
                 ),
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () {
+                    final manager =
+                        Provider.of<GameManager>(context, listen: false);
+                    if (manager.isLANConnected) manager.leaveLANRoom();
                     Navigator.pushNamedAndRemoveUntil(
                       context,
                       '/',
