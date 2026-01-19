@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
@@ -16,6 +17,9 @@ class _SplashScreenState extends State<SplashScreen>
   late final Animation<double> _logoOpacity;
   late final Animation<double> _textOpacity;
   late final Animation<Offset> _textSlide;
+
+  Timer? _textTimer;
+  Timer? _finishTimer;
 
   @override
   void initState() {
@@ -66,12 +70,12 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Start animations with stagger
     _logoController.forward();
-    Future.delayed(const Duration(milliseconds: 400), () {
+    _textTimer = Timer(const Duration(milliseconds: 400), () {
       if (mounted) _textController.forward();
     });
 
     // Navigate after total ~2 seconds
-    Future.delayed(const Duration(milliseconds: 2000), _finish);
+    _finishTimer = Timer(const Duration(milliseconds: 2000), _finish);
   }
 
   Future<void> _finish() async {
@@ -81,6 +85,8 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    _textTimer?.cancel();
+    _finishTimer?.cancel();
     _logoController.dispose();
     _textController.dispose();
     super.dispose();

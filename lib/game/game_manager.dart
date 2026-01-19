@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/services.dart';
 
 import 'package:flutter/foundation.dart';
 
@@ -57,11 +58,26 @@ class GameManager extends ChangeNotifier {
   // Discussion timer
   int discussionSecondsLeft = 0;
 
+  // Voting & night timers (seconds left)
+  int votingSecondsLeft = 0;
+  int nightSecondsLeft = 0;
+
+  // Configurable durations (can be set from Settings)
+  int discussionDuration = 90; // seconds
+  int votingDuration = 30; // seconds
+  int nightDuration = 30; // seconds
+
+  // Haptics preference (set from settings)
+  bool hapticsEnabled = true;
+
   // Chat system for Solo Mode
   List<ChatMessage> chatMessages = [];
 
   // Lobby chat messages (for LAN multiplayer)
   List<ChatMessage> lobbyChatMessages = [];
+
+  // Team (private) chat messages keyed by team name
+  final Map<String, List<ChatMessage>> teamChatMessages = {};
 
   // Host disconnect info for UI navigation
   String? disconnectReason;
@@ -88,6 +104,9 @@ class GameManager extends ChangeNotifier {
   BotController? _bot;
   Timer? _phaseTimer;
   Timer? _countdownTimer;
+  DateTime? _nightStartTime;
+  static const int _minNightDurationSec =
+      6; // minimum seconds for night to last
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CONSTRUCTOR
@@ -350,6 +369,8 @@ class GameManager extends ChangeNotifier {
 
     _assignRoles();
     phase = GamePhase.night;
+    _nightStartTime = DateTime.now();
+    nightSecondsLeft = nightDuration;
     _nightPendingKill = null;
     _nightSavedId = null;
     _nightVigilanteTarget = null;
@@ -357,13 +378,29 @@ class GameManager extends ChangeNotifier {
     _nightEscortBlocks.clear();
     _nightActionsCompleted.clear();
 
-    // Initialize bot controller for solo mode
-    if (mode == GameMode.soloBots) {
+    // Initialize bot controller if there are bots in the game (works for solo and LAN with bots)
+    if (players.any((p) => p.isBot)) {
       _bot = BotController(this);
       _bot!.onNightPhase();
     }
 
+    // Start night timer
+    _phaseTimer?.cancel();
+    _phaseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (nightSecondsLeft > 0) {
+        nightSecondsLeft--;
+        if (_isHost)
+          _lanComm?.broadcastPhaseCountdown(
+              GamePhase.night.name, nightSecondsLeft);
+        notifyListeners();
+      } else {
+        timer.cancel();
+        if (phase == GamePhase.night) advancePhase();
+      }
+    });
+
     _broadcastState();
+    _onPhaseStarted();
     notifyListeners();
   }
 
@@ -536,7 +573,12 @@ class GameManager extends ChangeNotifier {
     final allActed =
         specialRoles.every((p) => _nightActionsCompleted.contains(p.id));
 
-    if (allActed) {
+    final minElapsed = _nightStartTime != null &&
+        DateTime.now().difference(_nightStartTime!).inSeconds >=
+            _minNightDurationSec;
+
+    // Advance when either everyone has acted or minimum night duration passed
+    if (allActed || minElapsed) {
       // Auto-advance to discussion after a short delay
       Future.delayed(const Duration(seconds: 2), () {
         if (phase == GamePhase.night) {
@@ -648,22 +690,23 @@ class GameManager extends ChangeNotifier {
         phase = GamePhase.discussion;
         // Start discussion countdown
         _startDiscussionTimer();
-        // Trigger bot chat
-        if (mode == GameMode.soloBots) {
+        if (players.any((p) => p.isBot)) {
           _bot ??= BotController(this);
           _bot!.onDiscussionPhase();
         }
+        _onPhaseStarted();
         break;
 
       case GamePhase.mafiaVoting:
         // This phase is handled internally, just advance to discussion
         phase = GamePhase.discussion;
         _startDiscussionTimer();
-        // Trigger bot chat
-        if (mode == GameMode.soloBots) {
+        // Trigger bot chat (if bots present)
+        if (players.any((p) => p.isBot)) {
           _bot ??= BotController(this);
           _bot!.onDiscussionPhase();
         }
+        _onPhaseStarted();
         break;
 
       case GamePhase.discussion:
@@ -673,11 +716,27 @@ class GameManager extends ChangeNotifier {
         phase = GamePhase.voting;
         votes.clear();
         playerVotes.clear();
-        // Trigger bot voting
-        if (mode == GameMode.soloBots) {
+        // Start voting timer
+        votingSecondsLeft = votingDuration;
+        _phaseTimer?.cancel();
+        _phaseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          if (votingSecondsLeft > 0) {
+            votingSecondsLeft--;
+            if (_isHost)
+              _lanComm?.broadcastPhaseCountdown(
+                  GamePhase.voting.name, votingSecondsLeft);
+            notifyListeners();
+          } else {
+            timer.cancel();
+            if (phase == GamePhase.voting) advancePhase();
+          }
+        });
+        // Trigger bot voting (if bots present)
+        if (players.any((p) => p.isBot)) {
           _bot ??= BotController(this);
           _bot!.onVotingPhase();
         }
+        _onPhaseStarted();
         break;
 
       case GamePhase.voting:
@@ -699,18 +758,25 @@ class GameManager extends ChangeNotifier {
   bool get isOfflineMode => mode == GameMode.offlineP2P;
 
   void _startDiscussionTimer() {
-    // If offline mode, maybe just a reminder to talk in real life
-    discussionSecondsLeft = isOfflineMode ? 10 : 20;
-    _countdownTimer?.cancel();
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _phaseTimer?.cancel();
+
+    discussionSecondsLeft = discussionDuration;
+    // Broadcast initial countdown to clients if host
+    if (_isHost)
+      _lanComm?.broadcastPhaseCountdown(
+          GamePhase.discussion.name, discussionSecondsLeft);
+
+    _phaseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (discussionSecondsLeft > 0) {
         discussionSecondsLeft--;
+        // Broadcast tick
+        if (_isHost)
+          _lanComm?.broadcastPhaseCountdown(
+              GamePhase.discussion.name, discussionSecondsLeft);
         notifyListeners();
       } else {
         timer.cancel();
-        if (phase == GamePhase.discussion) {
-          advancePhase();
-        }
+        if (phase == GamePhase.discussion) advancePhase();
       }
     });
   }
@@ -722,6 +788,8 @@ class GameManager extends ChangeNotifier {
     }
 
     phase = GamePhase.night;
+    _nightStartTime = DateTime.now();
+    nightSecondsLeft = nightDuration;
     currentDay++;
     votes.clear();
     playerVotes.clear();
@@ -741,11 +809,28 @@ class GameManager extends ChangeNotifier {
     lastInspectedPlayerId = null;
     lastInspectionResult = null;
 
+    // Start night countdown
+    _phaseTimer?.cancel();
+    _phaseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (nightSecondsLeft > 0) {
+        nightSecondsLeft--;
+        if (_isHost)
+          _lanComm?.broadcastPhaseCountdown(
+              GamePhase.night.name, nightSecondsLeft);
+        notifyListeners();
+      } else {
+        timer.cancel();
+        // Ensure minimum night duration has passed
+        if (phase == GamePhase.night) advancePhase();
+      }
+    });
+
     if (mode == GameMode.soloBots) {
       _bot ??= BotController(this);
       _bot!.onNightPhase();
     }
 
+    _onPhaseStarted();
     notifyListeners();
   }
 
@@ -934,6 +1019,27 @@ class GameManager extends ChangeNotifier {
     _comm!.sendGameState(state);
   }
 
+  void _onPhaseStarted() {
+    // Haptic alert at phase start (if enabled)
+    try {
+      if (hapticsEnabled) HapticFeedback.vibrate();
+    } catch (_) {}
+
+    // Broadcast initial phase countdown to clients (if host)
+    if (_isHost) {
+      if (phase == GamePhase.discussion) {
+        _lanComm?.broadcastPhaseCountdown(
+            GamePhase.discussion.name, discussionSecondsLeft);
+      } else if (phase == GamePhase.voting) {
+        _lanComm?.broadcastPhaseCountdown(
+            GamePhase.voting.name, votingSecondsLeft);
+      } else if (phase == GamePhase.night) {
+        _lanComm?.broadcastPhaseCountdown(
+            GamePhase.night.name, nightSecondsLeft);
+      }
+    }
+  }
+
   void attachReceiver(GameCommunication comm) {
     _comm = comm;
     comm.onGameStateReceived((incoming) {
@@ -949,6 +1055,43 @@ class GameManager extends ChangeNotifier {
         _handleIncomingAction(action);
       }
     });
+
+    // If underlying comm supports team chat broadcasts, attach handler
+    if (comm is LANCommunication) {
+      comm.onTeamChatReceived = (team, senderId, senderName, message) {
+        final chatMsg = ChatMessage(
+          senderId: senderId,
+          senderName: senderName,
+          text: message,
+          timestamp: DateTime.now(),
+        );
+        teamChatMessages.putIfAbsent(team, () => []).add(chatMsg);
+        notifyListeners();
+      };
+
+      // Phase countdowns from host
+      comm.onPhaseCountdownReceived = (phaseStr, value) {
+        try {
+          final p = GamePhase.values.firstWhere((e) => e.name == phaseStr);
+          if (p == GamePhase.discussion) {
+            discussionSecondsLeft = value;
+          } else if (p == GamePhase.voting) {
+            votingSecondsLeft = value;
+          } else if (p == GamePhase.night) {
+            nightSecondsLeft = value;
+          }
+          notifyListeners();
+        } catch (_) {}
+      };
+
+      // Room settings updates from host (durations / haptics)
+      comm.onRoomSettingsChanged = (discussion, voting, night, haptics) {
+        if (discussion != null) setDiscussionDuration(discussion);
+        if (voting != null) setVotingDuration(voting);
+        if (night != null) setNightDuration(night);
+        if (haptics != null) setHapticsEnabled(haptics);
+      };
+    }
 
     // If we are a client and just attached, send a join action
     if (!isHost && localPlayer != null) {
@@ -973,6 +1116,37 @@ class GameManager extends ChangeNotifier {
         handleNightAction(action['actorId'], action['targetId']);
         break;
     }
+  }
+
+  // ===== Settings: durations & haptics =====
+  void setDiscussionDuration(int seconds) {
+    discussionDuration = seconds;
+    // If we're in discussion, update the remaining seconds proportionally
+    if (phase == GamePhase.discussion) {
+      discussionSecondsLeft = discussionDuration;
+      notifyListeners();
+    }
+  }
+
+  void setVotingDuration(int seconds) {
+    votingDuration = seconds;
+    if (phase == GamePhase.voting) {
+      votingSecondsLeft = votingDuration;
+      notifyListeners();
+    }
+  }
+
+  void setNightDuration(int seconds) {
+    nightDuration = seconds;
+    if (phase == GamePhase.night) {
+      nightSecondsLeft = nightDuration;
+      notifyListeners();
+    }
+  }
+
+  void setHapticsEnabled(bool enabled) {
+    hapticsEnabled = enabled;
+    notifyListeners();
   }
 
   void sendChatMessage(String senderId, String text) {
@@ -1112,6 +1286,18 @@ class GameManager extends ChangeNotifier {
     _lanComm!.onCountdownReceived = (value) {
       countdownValue = value;
       isCountingDown = value > 0;
+      notifyListeners();
+    };
+
+    // Handle team chat for host
+    _lanComm!.onTeamChatReceived = (team, senderId, senderName, message) {
+      final chatMsg = ChatMessage(
+        senderId: senderId,
+        senderName: senderName,
+        text: message,
+        timestamp: DateTime.now(),
+      );
+      teamChatMessages.putIfAbsent(team, () => []).add(chatMsg);
       notifyListeners();
     };
 
@@ -1423,21 +1609,159 @@ class GameManager extends ChangeNotifier {
     String? newPin,
     bool? chatEnabled,
     bool? moderatorMode,
+    bool? botsEnabled,
+    int? botCount,
+    int? discussionDurationSec,
+    int? votingDurationSec,
+    int? nightDurationSec,
+    bool? hapticsEnabled,
   }) {
     if (!_isHost || _lanComm == null) return;
 
+    // Broadcast to clients
     _lanComm!.updateRoomSettings(
       maxPlayers: maxPlayers,
       isPrivate: isPrivate,
       newPin: newPin,
       chatEnabled: chatEnabled,
       moderatorMode: moderatorMode,
+      botsEnabled: botsEnabled,
+      botCount: botCount,
+      discussionDuration: discussionDurationSec,
+      votingDuration: votingDurationSec,
+      nightDuration: nightDurationSec,
+      hapticsEnabled: hapticsEnabled,
     );
+
+    // Apply bot configuration locally for host
+    if (botsEnabled != null || botCount != null) {
+      final enabled =
+          botsEnabled ?? _lanComm!.currentRoom?.botsEnabled ?? false;
+      final count = botCount ?? _lanComm!.currentRoom?.botCount ?? 0;
+      setRoomBots(enabled: enabled, count: count);
+    }
+
+    // Apply durations/haptics locally for host immediately
+    if (discussionDurationSec != null)
+      setDiscussionDuration(discussionDurationSec);
+    if (votingDurationSec != null) setVotingDuration(votingDurationSec);
+    if (nightDurationSec != null) setNightDuration(nightDurationSec);
+    if (hapticsEnabled != null) setHapticsEnabled(hapticsEnabled);
+
     notifyListeners();
   }
 
   /// Get current room info
   RoomInfo? get currentRoom => _lanComm?.currentRoom;
+
+  /// Add or remove bots in the lobby (host only)
+  void setRoomBots({required bool enabled, required int count}) {
+    if (!_isHost) return;
+
+    // Remove all bots if disabled
+    if (!enabled) {
+      players.removeWhere((p) => p.isBot);
+      _lanComm?.updateRoomInfo(playerCount: players.length);
+      _broadcastState();
+      notifyListeners();
+      return;
+    }
+
+    // Compute caps based on max players
+    final currentBots = players.where((p) => p.isBot).toList();
+    final humanCount = players.where((p) => !p.isBot).length;
+    final maxPlayers =
+        _lanComm?.currentRoom?.maxPlayers ?? this.gameConfig.playerCount;
+    final maxAllowedBots = maxPlayers - humanCount;
+    final desiredBotCount = count.clamp(0, maxAllowedBots);
+    final delta = desiredBotCount - currentBots.length;
+
+    final rng = Random();
+    final names = [
+      'Alice',
+      'Bob',
+      'Cara',
+      'Dan',
+      'Eve',
+      'Finn',
+      'Gina',
+      'Hank',
+      'Ivy',
+      'Jack',
+      'Luna'
+    ];
+    final personalities = BotPersonality.values;
+
+    if (delta > 0) {
+      for (var i = 0; i < delta; i++) {
+        // Pick base name and ensure unique numbering if duplicate
+        final baseName = names[rng.nextInt(names.length)];
+        final existing =
+            players.where((p) => p.name.startsWith(baseName)).toList();
+        final suffix = existing.isEmpty ? '' : ' #${existing.length + 1}';
+        final name = '$baseName$suffix';
+        final id =
+            'bot_${DateTime.now().millisecondsSinceEpoch}_${rng.nextInt(9999)}';
+        final bot = Player(
+          id: id,
+          name: name,
+          role: Role.villager, // will be reassigned when game starts
+          isBot: true,
+          personality: personalities[rng.nextInt(personalities.length)],
+          isReady: true, // bots are auto-ready in lobby
+        );
+        players.add(bot);
+      }
+    } else if (delta < 0) {
+      var toRemove = -delta;
+      // Remove last added bots
+      for (int i = players.length - 1; i >= 0 && toRemove > 0; i--) {
+        if (players[i].isBot) {
+          players.removeAt(i);
+          toRemove--;
+        }
+      }
+    }
+
+    // Ensure bots are ready
+    players =
+        players.map((p) => p.isBot ? p.copyWith(isReady: true) : p).toList();
+
+    _lanComm?.updateRoomInfo(playerCount: players.length);
+    _broadcastState();
+    notifyListeners();
+
+    // Let bots send a short lobby greeting if chat is enabled
+    if (_lanComm?.currentRoom?.chatEnabled == true) {
+      _bot ??= BotController(this);
+      final newBots = players.where((p) => p.isBot).toList();
+      for (final bot in newBots) {
+        // schedule a brief delayed greeting
+        Future.delayed(Duration(seconds: Random().nextInt(3) + 1), () {
+          _bot?.sendLobbyGreeting(bot);
+        });
+      }
+    }
+  }
+
+  /// Host-side method to send a lobby chat message from a bot
+  void sendLobbyChatMessageFromBot(String botId, String message) {
+    final bot = players
+        .cast<Player?>()
+        .firstWhere((p) => p?.id == botId, orElse: () => null);
+    if (bot == null) return;
+
+    final chatMsg = ChatMessage(
+      senderId: bot.id,
+      senderName: bot.name,
+      text: message,
+      timestamp: DateTime.now(),
+    );
+
+    lobbyChatMessages.add(chatMsg);
+    _lanComm?.broadcastChatMessage(bot.id, bot.name, message);
+    notifyListeners();
+  }
 
   /// Start game countdown (host only)
   Future<void> startGameCountdown() async {
@@ -1508,6 +1832,38 @@ class GameManager extends ChangeNotifier {
       }
       notifyListeners();
     }
+  }
+
+  /// Send a team/private chat message (e.g., mafia chat)
+  void sendTeamChat(String team, String message) {
+    final sender = localPlayer;
+    if (sender == null) return;
+
+    final chatMsg = ChatMessage(
+      senderId: sender.id,
+      senderName: sender.name,
+      text: message,
+      timestamp: DateTime.now(),
+    );
+
+    // Store locally
+    teamChatMessages.putIfAbsent(team, () => []).add(chatMsg);
+
+    if (_isHost) {
+      // Host broadcasts directly to clients
+      if (_lanComm is LANCommunication) {
+        (_lanComm as LANCommunication)
+            .broadcastTeamChat(team, sender.id, sender.name, message);
+      }
+    } else {
+      // Client sends to host
+      if (_lanComm is LANCommunication) {
+        (_lanComm as LANCommunication)
+            .sendTeamChat(team, message, sender.id, sender.name);
+      }
+    }
+
+    notifyListeners();
   }
 
   @override

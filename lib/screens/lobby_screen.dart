@@ -97,13 +97,24 @@ class _LobbyScreenNewState extends State<LobbyScreenNew> {
         currentPin: manager.roomPin,
         currentChatEnabled: room.chatEnabled,
         currentModeratorMode: room.moderatorMode,
-        onSave: ({maxPlayers, isPrivate, newPin, chatEnabled, moderatorMode}) {
+        currentBotEnabled: room.botsEnabled,
+        currentBotCount: room.botCount,
+        onSave: (
+            {maxPlayers,
+            isPrivate,
+            newPin,
+            chatEnabled,
+            moderatorMode,
+            botsEnabled,
+            botCount}) {
           manager.updateRoomSettings(
             maxPlayers: maxPlayers,
             isPrivate: isPrivate,
             newPin: newPin,
             chatEnabled: chatEnabled,
             moderatorMode: moderatorMode,
+            botsEnabled: botsEnabled,
+            botCount: botCount,
           );
 
           // Show confirmation

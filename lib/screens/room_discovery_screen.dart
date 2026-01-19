@@ -474,107 +474,7 @@ class _RoomDiscoveryScreenState extends State<RoomDiscoveryScreen> {
                                   onPressed: _startDiscovery,
                                   child: const Text('Try again'),
                                 ),
-                                const SizedBox(height: 24),
-                                const Divider(color: AppColors.cardBorder),
-                                const SizedBox(height: 16),
-                                Text(
-                                  "Can't find the room?",
-                                  style: AppTextStyles.bodyMedium.copyWith(
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                OutlinedButton.icon(
-                                  onPressed: _showManualJoinDialog,
-                                  icon: const Icon(Icons.input, size: 18),
-                                  label: const Text('JOIN BY IP ADDRESS'),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppColors.primary,
-                                    side: const BorderSide(
-                                        color: AppColors.primary),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                OutlinedButton.icon(
-                                  onPressed: () async {
-                                    if (kIsWeb) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(const SnackBar(
-                                              content: Text(
-                                                  'QR scanning not supported on web')));
-                                      return;
-                                    }
-                                    final result =
-                                        await Navigator.push<String?>(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (_) =>
-                                              const QRScannerScreen()),
-                                    );
-                                    if (result != null && result.isNotEmpty) {
-                                      // QR format: ip:port|pin (pin is optional for public rooms)
-                                      // Examples: 192.168.1.100:41235|1234 or 192.168.1.100:41235
-                                      String ip = result.trim();
-                                      int port = 41235;
-                                      String? pin;
-                                      bool isPrivate = false;
-
-                                      // First check for PIN separator
-                                      if (ip.contains('|')) {
-                                        final pipeParts = ip.split('|');
-                                        ip = pipeParts[0];
-                                        if (pipeParts.length > 1 &&
-                                            pipeParts[1].isNotEmpty) {
-                                          pin = pipeParts[1];
-                                          isPrivate = true;
-                                        }
-                                      }
-
-                                      // Then parse ip:port
-                                      if (ip.contains(':')) {
-                                        final parts = ip.split(':');
-                                        ip = parts[0];
-                                        port = int.tryParse(parts.length > 1
-                                                ? parts[1]
-                                                : '') ??
-                                            41235;
-                                      }
-
-                                      final manager =
-                                          context.read<GameManager>();
-                                      final success =
-                                          await manager.joinLANRoomByIp(
-                                        ip,
-                                        widget.playerName,
-                                        port: port,
-                                        pin: pin,
-                                        isPrivate: isPrivate,
-                                      );
-                                      if (success) {
-                                        Navigator.pushNamed(context, '/lobby',
-                                            arguments: {
-                                              'name': widget.playerName,
-                                              'isHost': false,
-                                              'roomName': 'Room',
-                                            });
-                                      } else {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(SnackBar(
-                                                content: Text(isPrivate
-                                                    ? 'Failed to connect. Invalid PIN or host unavailable.'
-                                                    : 'Failed to connect to scanned IP')));
-                                      }
-                                    }
-                                  },
-                                  icon: const Icon(Icons.qr_code_scanner,
-                                      size: 18),
-                                  label: const Text('SCAN QR'),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppColors.primary,
-                                    side: const BorderSide(
-                                        color: AppColors.primary),
-                                  ),
-                                ),
+                              
                               ],
                             ),
                           ),
@@ -599,6 +499,100 @@ class _RoomDiscoveryScreenState extends State<RoomDiscoveryScreen> {
                             );
                           },
                         ),
+            ),
+            // Manual join area (always visible)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Divider(color: AppColors.cardBorder),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Can't find the room? Join manually:",
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _showManualJoinDialog,
+                    icon: const Icon(Icons.input, size: 18),
+                    label: const Text('JOIN BY IP ADDRESS'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      if (kIsWeb) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content:
+                                    Text('QR scanning not supported on web')));
+                        return;
+                      }
+                      final result = await Navigator.push<String?>(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const QRScannerScreen()),
+                      );
+                      if (result != null && result.isNotEmpty) {
+                        String ip = result.trim();
+                        int port = 41235;
+                        String? pin;
+                        bool isPrivate = false;
+
+                        if (ip.contains('|')) {
+                          final pipeParts = ip.split('|');
+                          ip = pipeParts[0];
+                          if (pipeParts.length > 1 && pipeParts[1].isNotEmpty) {
+                            pin = pipeParts[1];
+                            isPrivate = true;
+                          }
+                        }
+
+                        if (ip.contains(':')) {
+                          final parts = ip.split(':');
+                          ip = parts[0];
+                          port =
+                              int.tryParse(parts.length > 1 ? parts[1] : '') ??
+                                  41235;
+                        }
+
+                        final manager = context.read<GameManager>();
+                        final success = await manager.joinLANRoomByIp(
+                          ip,
+                          widget.playerName,
+                          port: port,
+                          pin: pin,
+                          isPrivate: isPrivate,
+                        );
+                        if (success) {
+                          Navigator.pushNamed(context, '/lobby', arguments: {
+                            'name': widget.playerName,
+                            'isHost': false,
+                            'roomName': 'Room',
+                          });
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(isPrivate
+                                  ? 'Failed to connect. Invalid PIN or host unavailable.'
+                                  : 'Failed to connect to scanned IP')));
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.qr_code_scanner, size: 18),
+                    label: const Text('SCAN QR'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                ],
+              ),
             ),
             if (_isJoining)
               Container(

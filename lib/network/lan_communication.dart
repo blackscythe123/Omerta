@@ -23,6 +23,8 @@ class RoomInfo {
   final bool isPrivate; // Whether the room requires a PIN to join
   final bool chatEnabled; // Whether lobby chat is enabled
   final bool moderatorMode; // Coming soon feature
+  final bool botsEnabled; // Whether host allows bots in this room
+  final int botCount; // Number of bots configured for the room
 
   // Runtime state (not saved, only for discovery)
   bool _isCountingDown = false;
@@ -41,6 +43,8 @@ class RoomInfo {
     this.isPrivate = false,
     this.chatEnabled = true,
     this.moderatorMode = false,
+    this.botsEnabled = false,
+    this.botCount = 0,
   });
 
   /// Create a copy with updated fields
@@ -56,6 +60,8 @@ class RoomInfo {
     bool? isPrivate,
     bool? chatEnabled,
     bool? moderatorMode,
+    bool? botsEnabled,
+    int? botCount,
   }) {
     return RoomInfo(
       hostId: hostId ?? this.hostId,
@@ -69,6 +75,8 @@ class RoomInfo {
       isPrivate: isPrivate ?? this.isPrivate,
       chatEnabled: chatEnabled ?? this.chatEnabled,
       moderatorMode: moderatorMode ?? this.moderatorMode,
+      botsEnabled: botsEnabled ?? this.botsEnabled,
+      botCount: botCount ?? this.botCount,
     );
   }
 
@@ -99,6 +107,8 @@ class RoomInfo {
         isPrivate: json['isPrivate'] ?? false,
         chatEnabled: json['chatEnabled'] ?? true,
         moderatorMode: json['moderatorMode'] ?? false,
+        botsEnabled: json['botsEnabled'] ?? false,
+        botCount: json['botCount'] ?? 0,
       );
 
   @override
@@ -141,6 +151,12 @@ class LANCommunication implements GameCommunication {
   Function(String playerId, String reason)? onPlayerKicked; // Kick notification
   Function(int value)? onCountdownReceived; // Countdown updates
   Function()? onGameStartReceived; // Game start signal
+  Function(String team, String senderId, String senderName, String message)?
+      onTeamChatReceived; // Team chat
+  Function(int? discussion, int? voting, int? night, bool? haptics)?
+      onRoomSettingsChanged; // Settings update
+  Function(String phase, int value)?
+      onPhaseCountdownReceived; // Phase countdown (host -> clients)
 
   // State
   final bool isHost;
@@ -336,6 +352,12 @@ class LANCommunication implements GameCommunication {
     String? newPin,
     bool? chatEnabled,
     bool? moderatorMode,
+    bool? botsEnabled,
+    int? botCount,
+    int? discussionDuration,
+    int? votingDuration,
+    int? nightDuration,
+    bool? hapticsEnabled,
   }) {
     if (!isHost || _currentRoom == null) return;
 
@@ -345,6 +367,8 @@ class LANCommunication implements GameCommunication {
       isPrivate: isPrivate,
       chatEnabled: chatEnabled,
       moderatorMode: moderatorMode,
+      botsEnabled: botsEnabled,
+      botCount: botCount,
     );
 
     // Update PIN if changed (private only)
@@ -359,6 +383,12 @@ class LANCommunication implements GameCommunication {
       'isPrivate': _currentRoom!.isPrivate,
       'chatEnabled': _currentRoom!.chatEnabled,
       'moderatorMode': _currentRoom!.moderatorMode,
+      'botsEnabled': _currentRoom!.botsEnabled,
+      'botCount': _currentRoom!.botCount,
+      'discussionDuration': discussionDuration,
+      'votingDuration': votingDuration,
+      'nightDuration': nightDuration,
+      'hapticsEnabled': hapticsEnabled,
     });
   }
 
@@ -455,6 +485,24 @@ class LANCommunication implements GameCommunication {
 
       case 'action':
         _onAction?.call(message['data'] as Map<String, dynamic>);
+        break;
+
+      case 'team_chat':
+        // Received from client - broadcast to team members
+        final team = message['team'] as String? ?? '';
+        final text = message['message'] as String? ?? '';
+        final senderId = message['senderId'] as String? ?? '';
+        final senderName = message['senderName'] as String? ?? '';
+        // Broadcast to all clients (clients will filter by team)
+        broadcastToClients({
+          'type': 'team_chat_broadcast',
+          'team': team,
+          'message': text,
+          'senderId': senderId,
+          'senderName': senderName,
+        });
+        // Host should also be notified locally
+        onTeamChatReceived?.call(team, senderId, senderName, text);
         break;
 
       case 'set_ready':
@@ -816,8 +864,16 @@ class LANCommunication implements GameCommunication {
             isPrivate: message['isPrivate'] as bool?,
             chatEnabled: message['chatEnabled'] as bool?,
             moderatorMode: message['moderatorMode'] as bool?,
+            botsEnabled: message['botsEnabled'] as bool?,
+            botCount: message['botCount'] as int?,
           );
         }
+        // Notify listeners about durations/haptics if provided
+        final discussion = message['discussionDuration'] as int?;
+        final voting = message['votingDuration'] as int?;
+        final night = message['nightDuration'] as int?;
+        final haptics = message['hapticsEnabled'] as bool?;
+        onRoomSettingsChanged?.call(discussion, voting, night, haptics);
         break;
 
       case 'start_countdown':
@@ -827,6 +883,20 @@ class LANCommunication implements GameCommunication {
 
       case 'start_game':
         onGameStartReceived?.call();
+        break;
+
+      case 'team_chat_broadcast':
+        final team = message['team'] as String? ?? '';
+        final text = message['message'] as String? ?? '';
+        final senderId = message['senderId'] as String? ?? '';
+        final senderName = message['senderName'] as String? ?? '';
+        onTeamChatReceived?.call(team, senderId, senderName, text);
+        break;
+
+      case 'phase_countdown':
+        final phase = message['phase'] as String? ?? '';
+        final value = message['value'] as int? ?? 0;
+        onPhaseCountdownReceived?.call(phase, value);
         break;
 
       case 'room_closed':
@@ -948,6 +1018,33 @@ class LANCommunication implements GameCommunication {
     });
   }
 
+  /// Send team chat to host (client only)
+  void sendTeamChat(
+      String team, String message, String senderId, String senderName) {
+    if (isHost) return;
+    if (_hostSocket == null) return;
+    _sendToSocket(_hostSocket!, {
+      'type': 'team_chat',
+      'team': team,
+      'message': message,
+      'senderId': senderId,
+      'senderName': senderName,
+    });
+  }
+
+  /// Broadcast team chat to all clients (host only)
+  void broadcastTeamChat(
+      String team, String senderId, String senderName, String message) {
+    if (!isHost) return;
+    broadcastToClients({
+      'type': 'team_chat_broadcast',
+      'team': team,
+      'message': message,
+      'senderId': senderId,
+      'senderName': senderName,
+    });
+  }
+
   /// Broadcast chat message to all clients (host only)
   void broadcastChatMessage(
       String senderId, String senderName, String message) {
@@ -967,6 +1064,16 @@ class LANCommunication implements GameCommunication {
     if (!isHost) return;
     broadcastToClients({
       'type': 'start_countdown',
+      'value': value,
+    });
+  }
+
+  /// Broadcast a phase-specific countdown to all clients (host only)
+  void broadcastPhaseCountdown(String phase, int value) {
+    if (!isHost) return;
+    broadcastToClients({
+      'type': 'phase_countdown',
+      'phase': phase,
       'value': value,
     });
   }

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import '../theme/app_theme.dart';
+import '../game/game_manager.dart';
+import '../models/game_state.dart';
 
 enum WaitingReason { nightAction, voting, otherPlayers }
 
@@ -91,6 +95,23 @@ class _WaitingScreenState extends State<WaitingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final manager = context.watch<GameManager>();
+
+    // Auto-close when the relevant phase completes
+    if (widget.reason == WaitingReason.voting &&
+        manager.phase != GamePhase.voting) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).pop();
+      });
+    }
+
+    if (widget.reason == WaitingReason.nightAction &&
+        manager.phase != GamePhase.night) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).pop();
+      });
+    }
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
