@@ -8,6 +8,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Night resolution - vigilante and mafia interactions', () {
+    
     test('mafia and vigilante kills both applied when different targets', () {
       final gm = GameManager();
 
