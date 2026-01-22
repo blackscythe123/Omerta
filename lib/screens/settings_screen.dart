@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import '../theme/app_theme.dart';
+import '../game/game_manager.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -9,11 +12,9 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  // Local toggles not currently persisted
   bool _soundEnabled = true;
-  bool _vibrationEnabled = true;
   bool _nightModeAnimation = true;
-  double _discussionTime = 90;
-  double _votingTime = 30;
 
   @override
   Widget build(BuildContext context) {
@@ -36,13 +37,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (v) => setState(() => _soundEnabled = v),
             ),
             const SizedBox(height: 12),
-            _buildSwitchTile(
-              icon: Icons.vibration,
-              title: 'Vibration',
-              subtitle: 'Haptic feedback for actions',
-              value: _vibrationEnabled,
-              onChanged: (v) => setState(() => _vibrationEnabled = v),
-            ),
+            Builder(builder: (context) {
+              final manager = context.watch<GameManager>();
+              return _buildSwitchTile(
+                icon: Icons.vibration,
+                title: 'Vibration',
+                subtitle: 'Haptic feedback for actions',
+                value: manager.hapticsEnabled,
+                onChanged: (v) {
+                  manager.setHapticsEnabled(v);
+                  if (manager.isHost) {
+                    manager.updateRoomSettings(hapticsEnabled: v);
+                  }
+                },
+              );
+            }),
             const SizedBox(height: 12),
             _buildSwitchTile(
               icon: Icons.animation,
@@ -54,27 +63,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 32),
             Text('GAME TIMERS', style: AppTextStyles.labelSmall),
             const SizedBox(height: 16),
-            _buildSliderTile(
-              icon: Icons.forum,
-              title: 'Discussion Time',
-              value: _discussionTime,
-              min: 30,
-              max: 180,
-              divisions: 5,
-              suffix: 's',
-              onChanged: (v) => setState(() => _discussionTime = v),
-            ),
+            Builder(builder: (context) {
+              final manager = context.watch<GameManager>();
+              return _buildSliderTile(
+                icon: Icons.forum,
+                title: 'Discussion Time',
+                value: manager.discussionDuration.toDouble(),
+                min: 30,
+                max: 180,
+                divisions: 15,
+                suffix: 's',
+                onChanged: (v) {
+                  manager.setDiscussionDuration(v.toInt());
+                  if (manager.isHost) {
+                    manager.updateRoomSettings(
+                        discussionDurationSec: v.toInt());
+                  }
+                },
+              );
+            }),
             const SizedBox(height: 16),
-            _buildSliderTile(
-              icon: Icons.how_to_vote,
-              title: 'Voting Time',
-              value: _votingTime,
-              min: 15,
-              max: 60,
-              divisions: 3,
-              suffix: 's',
-              onChanged: (v) => setState(() => _votingTime = v),
-            ),
+            Builder(builder: (context) {
+              final manager = context.watch<GameManager>();
+              return _buildSliderTile(
+                icon: Icons.how_to_vote,
+                title: 'Voting Time',
+                value: manager.votingDuration.toDouble(),
+                min: 15,
+                max: 180,
+                divisions: 17,
+                suffix: 's',
+                onChanged: (v) {
+                  manager.setVotingDuration(v.toInt());
+                  if (manager.isHost) {
+                    manager.updateRoomSettings(votingDurationSec: v.toInt());
+                  }
+                },
+              );
+            }),
             const SizedBox(height: 32),
             Text('ABOUT', style: AppTextStyles.labelSmall),
             const SizedBox(height: 16),

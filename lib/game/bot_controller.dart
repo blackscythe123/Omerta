@@ -13,10 +13,10 @@ class BotController {
 
   BotController(this.manager);
 
-  // Trigger night actions after a delay
+  // Trigger night actions after a delay (slightly longer to allow humans to act first)
   void onNightPhase() async {
     await Future.delayed(
-        Duration(seconds: _rng.nextInt(3) + 2)); // 2-4 second delay
+        Duration(seconds: _rng.nextInt(6) + 3)); // 3-8 second delay
     _performNightActions();
   }
 
@@ -47,6 +47,22 @@ class BotController {
       final text = _generateChatMessage(bot);
       manager.sendChatMessage(bot.id, text);
     }
+  }
+
+  /// Send a short greeting/message in the lobby when a bot is added
+  void sendLobbyGreeting(Player bot) async {
+    if (!bot.isBot) return;
+    final messages = [
+      "Hello! Ready to play.",
+      "Hi everyone, I'm here.",
+      "Looking forward to the game!",
+      "Good luck, everyone.",
+    ];
+
+    await Future.delayed(Duration(seconds: _rng.nextInt(3) + 1));
+    // Use manager method that broadcasts lobby chat from bot
+    manager.sendLobbyChatMessageFromBot(
+        bot.id, messages[_rng.nextInt(messages.length)]);
   }
 
   String _generateChatMessage(Player bot) {

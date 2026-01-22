@@ -21,6 +21,15 @@ class RoomInfo {
   final int maxPlayers;
   final bool inProgress;
   final bool isPrivate; // Whether the room requires a PIN to join
+  final bool chatEnabled; // Whether lobby chat is enabled
+  final bool moderatorMode; // Coming soon feature
+  final bool botsEnabled; // Whether host allows bots in this room
+  final int botCount; // Number of bots configured for the room
+
+  // Runtime state (not saved, only for discovery)
+  bool _isCountingDown = false;
+  bool get isCountingDown => _isCountingDown;
+  set isCountingDown(bool value) => _isCountingDown = value;
 
   RoomInfo({
     required this.hostId,
@@ -32,6 +41,10 @@ class RoomInfo {
     this.maxPlayers = 10,
     this.inProgress = false,
     this.isPrivate = false,
+    this.chatEnabled = true,
+    this.moderatorMode = false,
+    this.botsEnabled = false,
+    this.botCount = 0,
   });
 
   /// Create a copy with updated fields
@@ -45,6 +58,10 @@ class RoomInfo {
     int? maxPlayers,
     bool? inProgress,
     bool? isPrivate,
+    bool? chatEnabled,
+    bool? moderatorMode,
+    bool? botsEnabled,
+    int? botCount,
   }) {
     return RoomInfo(
       hostId: hostId ?? this.hostId,
@@ -56,6 +73,10 @@ class RoomInfo {
       maxPlayers: maxPlayers ?? this.maxPlayers,
       inProgress: inProgress ?? this.inProgress,
       isPrivate: isPrivate ?? this.isPrivate,
+      chatEnabled: chatEnabled ?? this.chatEnabled,
+      moderatorMode: moderatorMode ?? this.moderatorMode,
+      botsEnabled: botsEnabled ?? this.botsEnabled,
+      botCount: botCount ?? this.botCount,
     );
   }
 
@@ -70,6 +91,8 @@ class RoomInfo {
         'maxPlayers': maxPlayers,
         'inProgress': inProgress,
         'isPrivate': isPrivate,
+        'chatEnabled': chatEnabled,
+        'moderatorMode': moderatorMode,
       };
 
   factory RoomInfo.fromJson(Map<String, dynamic> json) => RoomInfo(
@@ -82,6 +105,10 @@ class RoomInfo {
         maxPlayers: json['maxPlayers'] ?? 10,
         inProgress: json['inProgress'] ?? false,
         isPrivate: json['isPrivate'] ?? false,
+        chatEnabled: json['chatEnabled'] ?? true,
+        moderatorMode: json['moderatorMode'] ?? false,
+        botsEnabled: json['botsEnabled'] ?? false,
+        botCount: json['botCount'] ?? 0,
       );
 
   @override
@@ -114,10 +141,24 @@ class LANCommunication implements GameCommunication {
   Function(GameState)? _onGameState;
   Function(Map<String, dynamic>)? _onAction;
   Function(RoomInfo)? onRoomDiscovered;
+  Function(String)?
+      onRoomClosed; // Notifies immediate room removal when host stops
   Function(String playerId, String playerName)? onPlayerJoined;
   Function(String playerId)? onPlayerLeft;
-  Function()? onDisconnectedFromHost;
+  Function(String reason)? onDisconnectedFromHost; // Now includes reason
   Function(String reason)? onJoinRejected;
+  Function(String playerId, bool isReady)? onPlayerReadyChanged; // Ready state
+  Function(String senderId, String senderName, String message)?
+      onChatMessage; // Lobby chat
+  Function(String playerId, String reason)? onPlayerKicked; // Kick notification
+  Function(int value)? onCountdownReceived; // Countdown updates
+  Function()? onGameStartReceived; // Game start signal
+  Function(String team, String senderId, String senderName, String message)?
+      onTeamChatReceived; // Team chat
+  Function(int? discussion, int? voting, int? night, bool? haptics)?
+      onRoomSettingsChanged; // Settings update
+  Function(String phase, int value)?
+      onPhaseCountdownReceived; // Phase countdown (host -> clients)
 
   // State
   final bool isHost;
@@ -197,9 +238,37 @@ class LANCommunication implements GameCommunication {
 
     try {
       // Start TCP server first
-      _tcpServer = await ServerSocket.bind(InternetAddress.anyIPv4, tcpPort);
-      print('[LAN] TCP server started on port $tcpPort');
+      // Try binding to the configured tcpPort, but fall back to nearby ports
+      // and finally to an ephemeral port (0) if needed. Use `shared: true`
+      // on ServerSocket.bind to avoid Windows bind errors when a port is in use.
+      ServerSocket? server;
+      int chosenPort = tcpPort;
+      final portsToTry = <int>[tcpPort]
+        ..addAll(List.generate(10, (i) => tcpPort + i + 1))
+        ..add(0);
 
+      for (final p in portsToTry) {
+        try {
+          server = await ServerSocket.bind(
+            InternetAddress.anyIPv4,
+            p,
+            shared:
+                true, // required on Windows when re-binding same (addr,port)
+          );
+          chosenPort = server.port;
+          print('[LAN] TCP server bound to port $chosenPort (requested $p)');
+          break;
+        } catch (e) {
+          print('[LAN] TCP bind failed for port $p: $e');
+          // Try next port
+        }
+      }
+
+      if (server == null) {
+        throw SocketException('Failed to bind TCP server on any port');
+      }
+
+      _tcpServer = server;
       _tcpServer!.listen(
         _handleClientConnection,
         onError: (e) => print('[LAN] TCP server error: $e'),
@@ -218,7 +287,7 @@ class LANCommunication implements GameCommunication {
         hostName: playerName,
         roomName: roomName,
         hostIp: localIp,
-        hostPort: tcpPort,
+        hostPort: _tcpServer!.port,
         playerCount: 1,
         isPrivate: isPrivate,
       );
@@ -306,6 +375,53 @@ class LANCommunication implements GameCommunication {
     }
   }
 
+  /// Update room settings (host only)
+  void updateRoomSettings({
+    int? maxPlayers,
+    bool? isPrivate,
+    String? newPin,
+    bool? chatEnabled,
+    bool? moderatorMode,
+    bool? botsEnabled,
+    int? botCount,
+    int? discussionDuration,
+    int? votingDuration,
+    int? nightDuration,
+    bool? hapticsEnabled,
+  }) {
+    if (!isHost || _currentRoom == null) return;
+
+    // Update local room info
+    _currentRoom = _currentRoom!.copyWith(
+      maxPlayers: maxPlayers,
+      isPrivate: isPrivate,
+      chatEnabled: chatEnabled,
+      moderatorMode: moderatorMode,
+      botsEnabled: botsEnabled,
+      botCount: botCount,
+    );
+
+    // Update PIN if changed (private only)
+    if (newPin != null && _currentRoom!.isPrivate) {
+      _roomPin = newPin;
+    }
+
+    // Broadcast settings to all clients
+    broadcastToClients({
+      'type': 'room_settings_update',
+      'maxPlayers': _currentRoom!.maxPlayers,
+      'isPrivate': _currentRoom!.isPrivate,
+      'chatEnabled': _currentRoom!.chatEnabled,
+      'moderatorMode': _currentRoom!.moderatorMode,
+      'botsEnabled': _currentRoom!.botsEnabled,
+      'botCount': _currentRoom!.botCount,
+      'discussionDuration': discussionDuration,
+      'votingDuration': votingDuration,
+      'nightDuration': nightDuration,
+      'hapticsEnabled': hapticsEnabled,
+    });
+  }
+
   void _handleClientConnection(Socket socket) {
     final address = '${socket.remoteAddress.address}:${socket.remotePort}';
     print('[LAN] Client connecting from $address');
@@ -348,11 +464,14 @@ class LANCommunication implements GameCommunication {
         final playerName = message['playerName'] as String;
         final providedPin = message['pin'] as String?;
 
-        // Check if game in progress
-        if (_currentRoom?.inProgress == true) {
+        // Check if game in progress or counting down
+        if (_currentRoom?.inProgress == true ||
+            _currentRoom?.isCountingDown == true) {
           _sendToSocket(socket, {
             'type': 'join_rejected',
-            'reason': 'Game already in progress',
+            'reason': _currentRoom?.isCountingDown == true
+                ? 'Game is starting'
+                : 'Game already in progress',
           });
           socket.close();
           return;
@@ -398,6 +517,41 @@ class LANCommunication implements GameCommunication {
         _onAction?.call(message['data'] as Map<String, dynamic>);
         break;
 
+      case 'team_chat':
+        // Received from client - broadcast to team members
+        final team = message['team'] as String? ?? '';
+        final text = message['message'] as String? ?? '';
+        final senderId = message['senderId'] as String? ?? '';
+        final senderName = message['senderName'] as String? ?? '';
+        // Broadcast to all clients (clients will filter by team)
+        broadcastToClients({
+          'type': 'team_chat_broadcast',
+          'team': team,
+          'message': text,
+          'senderId': senderId,
+          'senderName': senderName,
+        });
+        // Host should also be notified locally
+        onTeamChatReceived?.call(team, senderId, senderName, text);
+        break;
+
+      case 'set_ready':
+        final readyPlayerId = _getPlayerIdFromSocket(socket);
+        if (readyPlayerId != null) {
+          final isReady = message['value'] as bool;
+          onPlayerReadyChanged?.call(readyPlayerId, isReady);
+        }
+        break;
+
+      case 'chat':
+        final chatPlayerId = _getPlayerIdFromSocket(socket);
+        if (chatPlayerId != null) {
+          final text = message['message'] as String? ?? '';
+          final senderName = message['playerName'] as String? ?? 'Unknown';
+          onChatMessage?.call(chatPlayerId, senderName, text);
+        }
+        break;
+
       case 'ping':
         _sendToSocket(socket, {'type': 'pong'});
         break;
@@ -405,6 +559,16 @@ class LANCommunication implements GameCommunication {
       default:
         print('[LAN] Unknown message type from client: $type');
     }
+  }
+
+  /// Get player ID from socket
+  String? _getPlayerIdFromSocket(Socket socket) {
+    for (final entry in _clients.entries) {
+      if (entry.value == socket) {
+        return entry.key;
+      }
+    }
+    return null;
   }
 
   void _handleClientDisconnect(Socket socket) {
@@ -458,6 +622,30 @@ class LANCommunication implements GameCommunication {
   }
 
   Future<void> stopHosting() async {
+    // Send a final UDP message to signal immediate room closure to discovery listeners
+    if (_udpSocket != null && _currentRoom != null) {
+      try {
+        final data = utf8.encode(jsonEncode({
+          'type': 'room_closed',
+          'hostId': _currentRoom!.hostId,
+        }));
+        final broadcastAddresses = [
+          '255.255.255.255',
+          _getSubnetBroadcast(_currentRoom!.hostIp),
+        ];
+        for (final addr in broadcastAddresses) {
+          if (addr.isNotEmpty) {
+            try {
+              _udpSocket!.send(Uint8List.fromList(data), InternetAddress(addr),
+                  udpBroadcastPort);
+            } catch (_) {}
+          }
+        }
+      } catch (e) {
+        print('[LAN] Error sending final room_closed broadcast: $e');
+      }
+    }
+
     _broadcastTimer?.cancel();
     _broadcastTimer = null;
 
@@ -526,7 +714,9 @@ class LANCommunication implements GameCommunication {
       final message =
           jsonDecode(utf8.decode(datagram.data)) as Map<String, dynamic>;
 
-      if (message['type'] == 'room_broadcast') {
+      final type = message['type'] as String?;
+
+      if (type == 'room_broadcast') {
         final room = RoomInfo.fromJson(message['room'] as Map<String, dynamic>);
 
         final isNew = !_discoveredRooms.containsKey(room.hostId);
@@ -535,6 +725,13 @@ class LANCommunication implements GameCommunication {
 
         if (isNew || _discoveredRooms[room.hostId] != room) {
           onRoomDiscovered?.call(room);
+        }
+      } else if (type == 'room_closed') {
+        final hostId = message['hostId'] as String?;
+        if (hostId != null) {
+          _discoveredRooms.remove(hostId);
+          _roomLastSeen.remove(hostId);
+          onRoomClosed?.call(hostId);
         }
       }
     } catch (e) {
@@ -719,13 +916,71 @@ class LANCommunication implements GameCommunication {
         final reason = message['reason'] as String? ?? 'Kicked by host';
         print('[LAN] Kicked: $reason');
         _isConnected = false;
-        onDisconnectedFromHost?.call();
+        onDisconnectedFromHost?.call(reason);
+        break;
+
+      case 'room_settings_update':
+        // Update local room info with new settings
+        if (_currentRoom != null) {
+          _currentRoom = _currentRoom!.copyWith(
+            maxPlayers: message['maxPlayers'] as int?,
+            isPrivate: message['isPrivate'] as bool?,
+            chatEnabled: message['chatEnabled'] as bool?,
+            moderatorMode: message['moderatorMode'] as bool?,
+            botsEnabled: message['botsEnabled'] as bool?,
+            botCount: message['botCount'] as int?,
+          );
+        }
+        // Notify listeners about durations/haptics if provided
+        final discussion = message['discussionDuration'] as int?;
+        final voting = message['votingDuration'] as int?;
+        final night = message['nightDuration'] as int?;
+        final haptics = message['hapticsEnabled'] as bool?;
+        onRoomSettingsChanged?.call(discussion, voting, night, haptics);
+        break;
+
+      case 'start_countdown':
+        final value = message['value'] as int? ?? 0;
+        onCountdownReceived?.call(value);
+        break;
+
+      case 'start_game':
+        onGameStartReceived?.call();
+        break;
+
+      case 'team_chat_broadcast':
+        final team = message['team'] as String? ?? '';
+        final text = message['message'] as String? ?? '';
+        final senderId = message['senderId'] as String? ?? '';
+        final senderName = message['senderName'] as String? ?? '';
+        onTeamChatReceived?.call(team, senderId, senderName, text);
+        break;
+
+      case 'phase_countdown':
+        final phase = message['phase'] as String? ?? '';
+        final value = message['value'] as int? ?? 0;
+        onPhaseCountdownReceived?.call(phase, value);
         break;
 
       case 'room_closed':
         print('[LAN] Room closed by host');
         _isConnected = false;
-        onDisconnectedFromHost?.call();
+        onDisconnectedFromHost?.call('Host closed the room');
+        break;
+
+      case 'player_ready':
+        // Host broadcasts ready state changes to all clients
+        final playerId = message['playerId'] as String;
+        final isReady = message['value'] as bool;
+        onPlayerReadyChanged?.call(playerId, isReady);
+        break;
+
+      case 'chat_broadcast':
+        // Host broadcasts chat messages to all clients
+        final senderId = message['senderId'] as String;
+        final senderName = message['senderName'] as String;
+        final text = message['message'] as String;
+        onChatMessage?.call(senderId, senderName, text);
         break;
 
       case 'pong':
@@ -742,7 +997,7 @@ class LANCommunication implements GameCommunication {
     _socketBuffers.remove(_hostSocket);
     _hostSocket = null;
     _isConnected = false;
-    onDisconnectedFromHost?.call();
+    onDisconnectedFromHost?.call('Connection to host lost');
   }
 
   Future<void> leaveRoom() async {
@@ -790,6 +1045,108 @@ class LANCommunication implements GameCommunication {
   @override
   void onActionReceived(Function(Map<String, dynamic>) callback) {
     _onAction = callback;
+  }
+
+  // ============ READY STATE ============
+
+  /// Send ready state to host (client only)
+  void sendReadyState(bool isReady) {
+    if (isHost || _hostSocket == null) return;
+    _sendToSocket(_hostSocket!, {
+      'type': 'set_ready',
+      'value': isReady,
+    });
+  }
+
+  /// Broadcast ready state change to all clients (host only)
+  void broadcastReadyState(String playerId, bool isReady) {
+    if (!isHost) return;
+    broadcastToClients({
+      'type': 'player_ready',
+      'playerId': playerId,
+      'value': isReady,
+    });
+  }
+
+  // ============ LOBBY CHAT ============
+
+  /// Send chat message to host (client only)
+  void sendChatMessage(String message, String playerName) {
+    if (isHost) return;
+    if (_hostSocket == null) return;
+    _sendToSocket(_hostSocket!, {
+      'type': 'chat',
+      'message': message,
+      'playerName': playerName,
+    });
+  }
+
+  /// Send team chat to host (client only)
+  void sendTeamChat(
+      String team, String message, String senderId, String senderName) {
+    if (isHost) return;
+    if (_hostSocket == null) return;
+    _sendToSocket(_hostSocket!, {
+      'type': 'team_chat',
+      'team': team,
+      'message': message,
+      'senderId': senderId,
+      'senderName': senderName,
+    });
+  }
+
+  /// Broadcast team chat to all clients (host only)
+  void broadcastTeamChat(
+      String team, String senderId, String senderName, String message) {
+    if (!isHost) return;
+    broadcastToClients({
+      'type': 'team_chat_broadcast',
+      'team': team,
+      'message': message,
+      'senderId': senderId,
+      'senderName': senderName,
+    });
+  }
+
+  /// Broadcast chat message to all clients (host only)
+  void broadcastChatMessage(
+      String senderId, String senderName, String message) {
+    if (!isHost) return;
+    broadcastToClients({
+      'type': 'chat_broadcast',
+      'senderId': senderId,
+      'senderName': senderName,
+      'message': message,
+    });
+  }
+
+  // ============ COUNTDOWN & GAME START ============
+
+  /// Broadcast countdown value to all clients (host only)
+  void broadcastCountdown(int value) {
+    if (!isHost) return;
+    broadcastToClients({
+      'type': 'start_countdown',
+      'value': value,
+    });
+  }
+
+  /// Broadcast a phase-specific countdown to all clients (host only)
+  void broadcastPhaseCountdown(String phase, int value) {
+    if (!isHost) return;
+    broadcastToClients({
+      'type': 'phase_countdown',
+      'phase': phase,
+      'value': value,
+    });
+  }
+
+  /// Broadcast game start to all clients (host only)
+  void broadcastGameStart() {
+    if (!isHost) return;
+    broadcastToClients({
+      'type': 'start_game',
+    });
   }
 
   // ============ HELPER ============

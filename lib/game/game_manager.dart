@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/services.dart';
 
 import 'package:flutter/foundation.dart';
 
@@ -57,8 +58,34 @@ class GameManager extends ChangeNotifier {
   // Discussion timer
   int discussionSecondsLeft = 0;
 
+  // Voting & night timers (seconds left)
+  int votingSecondsLeft = 0;
+  int nightSecondsLeft = 0;
+
+  // Configurable durations (can be set from Settings)
+  int discussionDuration = 90; // seconds
+  int votingDuration = 30; // seconds
+  int nightDuration = 30; // seconds
+
+  // Haptics preference (set from settings)
+  bool hapticsEnabled = true;
+
   // Chat system for Solo Mode
   List<ChatMessage> chatMessages = [];
+
+  // Lobby chat messages (for LAN multiplayer)
+  List<ChatMessage> lobbyChatMessages = [];
+
+  // Team (private) chat messages keyed by team name
+  final Map<String, List<ChatMessage>> teamChatMessages = {};
+
+  // Host disconnect info for UI navigation
+  String? disconnectReason;
+  bool wasDisconnected = false;
+
+  // Countdown state
+  bool isCountingDown = false;
+  int countdownValue = 0;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // INTERNAL STATE
@@ -77,6 +104,9 @@ class GameManager extends ChangeNotifier {
   BotController? _bot;
   Timer? _phaseTimer;
   Timer? _countdownTimer;
+  DateTime? _nightStartTime;
+  static const int _minNightDurationSec =
+      6; // minimum seconds for night to last
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CONSTRUCTOR
@@ -198,6 +228,7 @@ class GameManager extends ChangeNotifier {
         role: Role.villager, // Will be reassigned
         isBot: true,
         personality: personalities[rng.nextInt(personalities.length)],
+        isReady: true, // bots should start ready in solo games
       ));
     }
 
@@ -258,8 +289,78 @@ class GameManager extends ChangeNotifier {
         );
   }
 
-  /// Check if we have enough players to start
-  bool get canStartGame => players.length >= 5;
+  /// Check if we have enough players and all are ready to start
+  bool get canStartGame {
+    // Minimum players required to start is 6 (avoid unbalanced 5-player setups)
+    if (players.length < 6) return false;
+    // Check if all non-host players are ready
+    return players.every((p) => p.isReady);
+  }
+
+  /// Check if all players are ready (for UI display)
+  bool get allPlayersReady => players.every((p) => p.isReady);
+
+  /// Get count of ready players
+  int get readyPlayerCount => players.where((p) => p.isReady).length;
+
+  /// Set local player ready state (client only)
+  void setLocalPlayerReady(bool isReady) {
+    if (_isHost) return; // Host is always ready
+
+    final playerIndex = players.indexWhere((p) => p.id == localPlayerId);
+    if (playerIndex >= 0) {
+      players[playerIndex] = players[playerIndex].copyWith(isReady: isReady);
+      _lanComm?.sendReadyState(isReady);
+      notifyListeners();
+    }
+  }
+
+  /// Send lobby chat message
+  void sendLobbyChatMessage(String message) {
+    if (message.trim().isEmpty) return;
+
+    final player = localPlayer;
+    if (player == null) return;
+
+    final chatMsg = ChatMessage(
+      senderId: player.id,
+      senderName: player.name,
+      text: message.trim(),
+      timestamp: DateTime.now(),
+    );
+
+    lobbyChatMessages.add(chatMsg);
+
+    if (_isHost) {
+      // Host broadcasts to all clients
+      _lanComm?.broadcastChatMessage(player.id, player.name, message.trim());
+    } else {
+      // Client sends to host
+      _lanComm?.sendChatMessage(message.trim(), player.name);
+    }
+
+    notifyListeners();
+  }
+
+  /// Clear disconnect state (called when navigating away from error)
+  void clearDisconnectState() {
+    wasDisconnected = false;
+    disconnectReason = null;
+    notifyListeners();
+  }
+
+  /// Kick a player from the room (host only)
+  void kickPlayer(String playerId) {
+    if (!_isHost || playerId == localPlayerId) return;
+
+    // Remove player from list
+    players.removeWhere((p) => p.id == playerId);
+
+    // Kick via network
+    _lanComm?.kickClient(playerId);
+
+    notifyListeners();
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // GAME START
@@ -270,6 +371,8 @@ class GameManager extends ChangeNotifier {
 
     _assignRoles();
     phase = GamePhase.night;
+    _nightStartTime = DateTime.now();
+    nightSecondsLeft = nightDuration;
     _nightPendingKill = null;
     _nightSavedId = null;
     _nightVigilanteTarget = null;
@@ -277,13 +380,29 @@ class GameManager extends ChangeNotifier {
     _nightEscortBlocks.clear();
     _nightActionsCompleted.clear();
 
-    // Initialize bot controller for solo mode
-    if (mode == GameMode.soloBots) {
+    // Initialize bot controller if there are bots in the game (works for solo and LAN with bots)
+    if (players.any((p) => p.isBot)) {
       _bot = BotController(this);
       _bot!.onNightPhase();
     }
 
+    // Start night timer
+    _phaseTimer?.cancel();
+    _phaseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (nightSecondsLeft > 0) {
+        nightSecondsLeft--;
+        if (_isHost)
+          _lanComm?.broadcastPhaseCountdown(
+              GamePhase.night.name, nightSecondsLeft);
+        notifyListeners();
+      } else {
+        timer.cancel();
+        if (phase == GamePhase.night) advancePhase();
+      }
+    });
+
     _broadcastState();
+    _onPhaseStarted();
     notifyListeners();
   }
 
@@ -293,10 +412,29 @@ class GameManager extends ChangeNotifier {
 
   /// Handle night action from a player
   void handleNightAction(String actorId, String targetId) {
-    if (phase != GamePhase.night) return;
+    print(
+        '[GameManager] handleNightAction called: actor=$actorId target=$targetId phase=$phase');
+    if (phase != GamePhase.night) {
+      print('[GameManager] handleNightAction blocked: not in night phase');
+      return;
+    }
 
     final actor = _findPlayer(actorId);
-    if (actor == null || !actor.isAlive) return;
+    if (actor == null) {
+      print('[GameManager] handleNightAction blocked: actor not found');
+      return;
+    }
+    if (!actor.isAlive) {
+      print('[GameManager] handleNightAction blocked: actor is dead');
+      return;
+    }
+
+    // Prevent duplicate actions within same night
+    if (_nightActionsCompleted.contains(actorId)) {
+      print(
+          '[GameManager] handleNightAction ignored: actor already acted this night');
+      return;
+    }
 
     switch (actor.role) {
       case Role.mafia:
@@ -347,6 +485,8 @@ class GameManager extends ChangeNotifier {
 
     // If client, send action to host
     if (!_isHost && _comm != null) {
+      print(
+          '[GameManager] sending nightAction to host: actor=$actorId target=$targetId');
       _comm!.sendAction({
         'type': 'nightAction',
         'actorId': actorId,
@@ -367,15 +507,25 @@ class GameManager extends ChangeNotifier {
 
   /// Submit a mafia vote for who to kill
   void submitMafiaVote(String mafiaId, String targetId) {
-    if (phase != GamePhase.night) return;
+    print(
+        '[GameManager] submitMafiaVote: mafia=$mafiaId target=$targetId phase=$phase');
+    if (phase != GamePhase.night) {
+      print('[GameManager] submitMafiaVote blocked: not in night phase');
+      return;
+    }
 
     final mafia = _findPlayer(mafiaId);
     if (mafia == null ||
         !mafia.isAlive ||
-        (mafia.role != Role.mafia && mafia.role != Role.godfather)) return;
+        (mafia.role != Role.mafia && mafia.role != Role.godfather)) {
+      print('[GameManager] submitMafiaVote blocked: invalid mafia actor');
+      return;
+    }
 
     mafiaNightVotes[mafiaId] = targetId;
     _nightActionsCompleted.add(mafiaId);
+
+    print('[GameManager] mafiaNightVotes: ${mafiaNightVotes}');
 
     // Check for mafia consensus
     _checkMafiaConsensus();
@@ -398,6 +548,8 @@ class GameManager extends ChangeNotifier {
       voteCounts[vote] = (voteCounts[vote] ?? 0) + 1;
     }
 
+    print('[GameManager] _checkMafiaConsensus votes=$voteCounts');
+
     // Find target with majority or most votes
     if (voteCounts.isEmpty) {
       mafiaConsensusTarget = null;
@@ -418,6 +570,10 @@ class GameManager extends ChangeNotifier {
       // Pick the first one (could randomize ties)
       mafiaConsensusTarget = topTargets.first;
       _nightPendingKill = mafiaConsensusTarget;
+      print('[GameManager] Mafia consensus reached: $_nightPendingKill');
+    } else {
+      print(
+          '[GameManager] No consensus yet: allMafiaVoted=$allMafiaVoted topTargets=$topTargets');
     }
   }
 
@@ -448,6 +604,60 @@ class GameManager extends ChangeNotifier {
     return _nightActionsCompleted.contains(localPlayerId);
   }
 
+  /// Client-side request to ask host to restart the match (will be ignored on host)
+  void requestRestart() {
+    if (_isHost) return;
+    if (_comm != null) {
+      _comm!.sendAction({'type': 'request_restart', 'playerId': localPlayerId});
+    }
+  }
+
+  /// Host-side restart the match, keeping players & room settings but returning to lobby
+  void restartGame() {
+    // Clear game-specific state but keep players and current room
+    gameOver = false;
+    winningTeam = null;
+    phase = GamePhase.lobby;
+
+    // Reset day counter
+    currentDay = 1;
+
+    // Clear voting/night state
+    votes.clear();
+    playerVotes.clear();
+    mafiaNightVotes.clear();
+    mafiaConsensusTarget = null;
+    lastEliminatedPlayerId = null;
+    lastEliminatedRole = null;
+    nightKillTargetId = null;
+    nightKillSaved = null;
+    lastInspectedPlayerId = null;
+    lastInspectionResult = null;
+    _nightPendingKill = null;
+    _nightSavedId = null;
+    _nightVigilanteTarget = null;
+    _nightSerialKillerTarget = null;
+    _nightEscortBlocks.clear();
+    _nightActionsCompleted.clear();
+    _lastRoundVoters.clear();
+    _phaseTimer?.cancel();
+    _countdownTimer?.cancel();
+    _phaseTimer = null;
+    _countdownTimer = null;
+
+    // Players are returned to not-ready state (they may re-ready in lobby)
+    players =
+        players.map((p) => p.copyWith(isReady: false, isAlive: true)).toList();
+
+    // If host, mark room as not in progress and notify clients
+    if (_isHost && _lanComm != null) {
+      _lanComm!.updateRoomInfo(inProgress: false);
+      _broadcastState();
+    }
+
+    notifyListeners();
+  }
+
   void _checkNightComplete() {
     // Check if all alive special roles have acted
     final specialRoles =
@@ -456,7 +666,12 @@ class GameManager extends ChangeNotifier {
     final allActed =
         specialRoles.every((p) => _nightActionsCompleted.contains(p.id));
 
-    if (allActed) {
+    final minElapsed = _nightStartTime != null &&
+        DateTime.now().difference(_nightStartTime!).inSeconds >=
+            _minNightDurationSec;
+
+    // Advance when either everyone has acted or minimum night duration passed
+    if (allActed || minElapsed) {
       // Auto-advance to discussion after a short delay
       Future.delayed(const Duration(seconds: 2), () {
         if (phase == GamePhase.night) {
@@ -471,10 +686,22 @@ class GameManager extends ChangeNotifier {
   // ═══════════════════════════════════════════════════════════════════════════
 
   void castVote(String voterId, String targetId) {
-    if (phase != GamePhase.voting) return;
+    print(
+        '[GameManager] castVote called: voter=$voterId target=$targetId phase=$phase');
+    if (phase != GamePhase.voting) {
+      print('[GameManager] castVote blocked: not in voting phase');
+      return;
+    }
 
     final voter = _findPlayer(voterId);
-    if (voter == null || !voter.isAlive) return;
+    if (voter == null) {
+      print('[GameManager] castVote blocked: voter not found');
+      return;
+    }
+    if (!voter.isAlive) {
+      print('[GameManager] castVote blocked: voter is dead');
+      return;
+    }
 
     // Remove prior vote by this voter
     final priorTarget = playerVotes[voterId];
@@ -568,22 +795,23 @@ class GameManager extends ChangeNotifier {
         phase = GamePhase.discussion;
         // Start discussion countdown
         _startDiscussionTimer();
-        // Trigger bot chat
-        if (mode == GameMode.soloBots) {
+        if (players.any((p) => p.isBot)) {
           _bot ??= BotController(this);
           _bot!.onDiscussionPhase();
         }
+        _onPhaseStarted();
         break;
 
       case GamePhase.mafiaVoting:
         // This phase is handled internally, just advance to discussion
         phase = GamePhase.discussion;
         _startDiscussionTimer();
-        // Trigger bot chat
-        if (mode == GameMode.soloBots) {
+        // Trigger bot chat (if bots present)
+        if (players.any((p) => p.isBot)) {
           _bot ??= BotController(this);
           _bot!.onDiscussionPhase();
         }
+        _onPhaseStarted();
         break;
 
       case GamePhase.discussion:
@@ -593,16 +821,38 @@ class GameManager extends ChangeNotifier {
         phase = GamePhase.voting;
         votes.clear();
         playerVotes.clear();
-        // Trigger bot voting
-        if (mode == GameMode.soloBots) {
+        // Start voting timer
+        votingSecondsLeft = votingDuration;
+        _phaseTimer?.cancel();
+        _phaseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          if (votingSecondsLeft > 0) {
+            votingSecondsLeft--;
+            if (_isHost)
+              _lanComm?.broadcastPhaseCountdown(
+                  GamePhase.voting.name, votingSecondsLeft);
+            notifyListeners();
+          } else {
+            timer.cancel();
+            if (phase == GamePhase.voting) advancePhase();
+          }
+        });
+        // Trigger bot voting (if bots present)
+        if (players.any((p) => p.isBot)) {
           _bot ??= BotController(this);
           _bot!.onVotingPhase();
         }
+        _onPhaseStarted();
         break;
 
       case GamePhase.voting:
         processVotes();
         phase = GamePhase.result;
+        // Let players see the result for a short time before starting the next night
+        Timer(const Duration(seconds: 4), () {
+          if (phase == GamePhase.result && !gameOver) {
+            _startNextRound();
+          }
+        });
         break;
 
       case GamePhase.result:
@@ -619,18 +869,25 @@ class GameManager extends ChangeNotifier {
   bool get isOfflineMode => mode == GameMode.offlineP2P;
 
   void _startDiscussionTimer() {
-    // If offline mode, maybe just a reminder to talk in real life
-    discussionSecondsLeft = isOfflineMode ? 10 : 20;
-    _countdownTimer?.cancel();
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _phaseTimer?.cancel();
+
+    discussionSecondsLeft = discussionDuration;
+    // Broadcast initial countdown to clients if host
+    if (_isHost)
+      _lanComm?.broadcastPhaseCountdown(
+          GamePhase.discussion.name, discussionSecondsLeft);
+
+    _phaseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (discussionSecondsLeft > 0) {
         discussionSecondsLeft--;
+        // Broadcast tick
+        if (_isHost)
+          _lanComm?.broadcastPhaseCountdown(
+              GamePhase.discussion.name, discussionSecondsLeft);
         notifyListeners();
       } else {
         timer.cancel();
-        if (phase == GamePhase.discussion) {
-          advancePhase();
-        }
+        if (phase == GamePhase.discussion) advancePhase();
       }
     });
   }
@@ -642,6 +899,8 @@ class GameManager extends ChangeNotifier {
     }
 
     phase = GamePhase.night;
+    _nightStartTime = DateTime.now();
+    nightSecondsLeft = nightDuration;
     currentDay++;
     votes.clear();
     playerVotes.clear();
@@ -661,11 +920,28 @@ class GameManager extends ChangeNotifier {
     lastInspectedPlayerId = null;
     lastInspectionResult = null;
 
+    // Start night countdown
+    _phaseTimer?.cancel();
+    _phaseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (nightSecondsLeft > 0) {
+        nightSecondsLeft--;
+        if (_isHost)
+          _lanComm?.broadcastPhaseCountdown(
+              GamePhase.night.name, nightSecondsLeft);
+        notifyListeners();
+      } else {
+        timer.cancel();
+        // Ensure minimum night duration has passed
+        if (phase == GamePhase.night) advancePhase();
+      }
+    });
+
     if (mode == GameMode.soloBots) {
       _bot ??= BotController(this);
       _bot!.onNightPhase();
     }
 
+    _onPhaseStarted();
     notifyListeners();
   }
 
@@ -678,25 +954,45 @@ class GameManager extends ChangeNotifier {
     // If a role is blocked, their action doesn't count.
 
     // 2. Mafia Kill
-    if (_nightPendingKill != null &&
-        !blockedTargets.contains(_findMafiaCaller())) {
-      if (_nightPendingKill != savedId) {
-        killedIds.add(_nightPendingKill!);
-        nightKillTargetId = _nightPendingKill;
-        nightKillSaved = false;
+    print(
+        '[GameManager] _resolveNightActions: pendingKill=$_nightPendingKill savedId=$savedId blockedTargets=$blockedTargets');
+    if (_nightPendingKill != null) {
+      // Mafia kill only proceeds if the mafia consensus exists and attacker(s) not all blocked
+      final mafiaCallerBlocked =
+          aliveMafia().every((m) => blockedTargets.contains(m.id));
+      if (!mafiaCallerBlocked) {
+        if (_nightPendingKill != savedId) {
+          killedIds.add(_nightPendingKill!);
+          nightKillTargetId = _nightPendingKill;
+          nightKillSaved = false;
+          print('[GameManager] Mafia kill scheduled: ${_nightPendingKill}');
+        } else {
+          nightKillSaved = true;
+          print('[GameManager] Mafia kill saved by doctor');
+        }
       } else {
-        nightKillSaved = true;
+        print('[GameManager] Mafia kill blocked (all mafia blocked)');
       }
     }
 
     // 3. Vigilante Kill
     if (_nightVigilanteTarget != null) {
-      final vigilante =
-          players.firstWhere((p) => p.role == Role.vigilante && p.isAlive);
-      if (!blockedTargets.contains(vigilante.id)) {
-        if (_nightVigilanteTarget != savedId) {
-          killedIds.add(_nightVigilanteTarget!);
+      try {
+        final vigilante =
+            players.firstWhere((p) => p.role == Role.vigilante && p.isAlive);
+        if (!blockedTargets.contains(vigilante.id)) {
+          if (_nightVigilanteTarget != savedId) {
+            killedIds.add(_nightVigilanteTarget!);
+            print(
+                '[GameManager] Vigilante kill scheduled: ${_nightVigilanteTarget}');
+          } else {
+            print('[GameManager] Vigilante kill saved by doctor');
+          }
+        } else {
+          print('[GameManager] Vigilante blocked by escort');
         }
+      } catch (_) {
+        // no vigilante alive
       }
     }
 
@@ -717,6 +1013,7 @@ class GameManager extends ChangeNotifier {
       final victim = _findPlayer(id);
       if (victim != null) {
         victim.isAlive = false;
+        print('[GameManager] Player eliminated: ${victim.id} (${victim.name})');
       }
     }
 
@@ -726,6 +1023,8 @@ class GameManager extends ChangeNotifier {
     _nightSerialKillerTarget = null;
     _nightEscortBlocks.clear();
     checkWinCondition();
+    print(
+        '[GameManager] After resolution: alive=${alivePlayers.map((p) => p.id)}');
   }
 
   String? _findMafiaCaller() {
@@ -854,6 +1153,27 @@ class GameManager extends ChangeNotifier {
     _comm!.sendGameState(state);
   }
 
+  void _onPhaseStarted() {
+    // Haptic alert at phase start (if enabled)
+    try {
+      if (hapticsEnabled) HapticFeedback.vibrate();
+    } catch (_) {}
+
+    // Broadcast initial phase countdown to clients (if host)
+    if (_isHost) {
+      if (phase == GamePhase.discussion) {
+        _lanComm?.broadcastPhaseCountdown(
+            GamePhase.discussion.name, discussionSecondsLeft);
+      } else if (phase == GamePhase.voting) {
+        _lanComm?.broadcastPhaseCountdown(
+            GamePhase.voting.name, votingSecondsLeft);
+      } else if (phase == GamePhase.night) {
+        _lanComm?.broadcastPhaseCountdown(
+            GamePhase.night.name, nightSecondsLeft);
+      }
+    }
+  }
+
   void attachReceiver(GameCommunication comm) {
     _comm = comm;
     comm.onGameStateReceived((incoming) {
@@ -869,6 +1189,43 @@ class GameManager extends ChangeNotifier {
         _handleIncomingAction(action);
       }
     });
+
+    // If underlying comm supports team chat broadcasts, attach handler
+    if (comm is LANCommunication) {
+      comm.onTeamChatReceived = (team, senderId, senderName, message) {
+        final chatMsg = ChatMessage(
+          senderId: senderId,
+          senderName: senderName,
+          text: message,
+          timestamp: DateTime.now(),
+        );
+        teamChatMessages.putIfAbsent(team, () => []).add(chatMsg);
+        notifyListeners();
+      };
+
+      // Phase countdowns from host
+      comm.onPhaseCountdownReceived = (phaseStr, value) {
+        try {
+          final p = GamePhase.values.firstWhere((e) => e.name == phaseStr);
+          if (p == GamePhase.discussion) {
+            discussionSecondsLeft = value;
+          } else if (p == GamePhase.voting) {
+            votingSecondsLeft = value;
+          } else if (p == GamePhase.night) {
+            nightSecondsLeft = value;
+          }
+          notifyListeners();
+        } catch (_) {}
+      };
+
+      // Room settings updates from host (durations / haptics)
+      comm.onRoomSettingsChanged = (discussion, voting, night, haptics) {
+        if (discussion != null) setDiscussionDuration(discussion);
+        if (voting != null) setVotingDuration(voting);
+        if (night != null) setNightDuration(night);
+        if (haptics != null) setHapticsEnabled(haptics);
+      };
+    }
 
     // If we are a client and just attached, send a join action
     if (!isHost && localPlayer != null) {
@@ -892,7 +1249,44 @@ class GameManager extends ChangeNotifier {
       case 'nightAction':
         handleNightAction(action['actorId'], action['targetId']);
         break;
+      case 'request_restart':
+        // A client asked the host to restart the match
+        if (isHost) {
+          restartGame();
+        }
+        break;
     }
+  }
+
+  // ===== Settings: durations & haptics =====
+  void setDiscussionDuration(int seconds) {
+    discussionDuration = seconds;
+    // If we're in discussion, update the remaining seconds proportionally
+    if (phase == GamePhase.discussion) {
+      discussionSecondsLeft = discussionDuration;
+      notifyListeners();
+    }
+  }
+
+  void setVotingDuration(int seconds) {
+    votingDuration = seconds;
+    if (phase == GamePhase.voting) {
+      votingSecondsLeft = votingDuration;
+      notifyListeners();
+    }
+  }
+
+  void setNightDuration(int seconds) {
+    nightDuration = seconds;
+    if (phase == GamePhase.night) {
+      nightSecondsLeft = nightDuration;
+      notifyListeners();
+    }
+  }
+
+  void setHapticsEnabled(bool enabled) {
+    hapticsEnabled = enabled;
+    notifyListeners();
   }
 
   void sendChatMessage(String senderId, String text) {
@@ -964,15 +1358,21 @@ class GameManager extends ChangeNotifier {
     final playerId = 'host_${DateTime.now().millisecondsSinceEpoch}';
     localPlayerId = playerId;
 
-    // Create local player
+    // Create local player (host is always ready)
     players = [
       Player(
         id: playerId,
         name: playerName,
         role: Role.villager,
         isBot: false,
+        isReady: true, // Host is always ready
       )
     ];
+
+    // Clear disconnect state
+    wasDisconnected = false;
+    disconnectReason = null;
+    lobbyChatMessages.clear();
 
     // Create LAN communication
     _lanComm = LANCommunication(isHost: true);
@@ -986,8 +1386,64 @@ class GameManager extends ChangeNotifier {
     _lanComm!.onPlayerLeft = (id) {
       players.removeWhere((p) => p.id == id);
       _lanComm!.updateRoomInfo(playerCount: players.length);
+
+      // Cancel countdown if a player leaves
+      if (isCountingDown) {
+        cancelGameCountdown();
+      }
+
       _broadcastState();
       notifyListeners();
+    };
+
+    // Handle ready state changes from clients
+    _lanComm!.onPlayerReadyChanged = (playerId, isReady) {
+      final playerIndex = players.indexWhere((p) => p.id == playerId);
+      if (playerIndex >= 0) {
+        players[playerIndex] = players[playerIndex].copyWith(isReady: isReady);
+        // Broadcast to all clients
+        _lanComm!.broadcastReadyState(playerId, isReady);
+        _broadcastState();
+        notifyListeners();
+      }
+    };
+
+    // Handle chat messages from clients
+    _lanComm!.onChatMessage = (senderId, senderName, message) {
+      final chatMsg = ChatMessage(
+        senderId: senderId,
+        senderName: senderName,
+        text: message,
+        timestamp: DateTime.now(),
+      );
+      lobbyChatMessages.add(chatMsg);
+      // Broadcast to all clients
+      _lanComm!.broadcastChatMessage(senderId, senderName, message);
+      notifyListeners();
+    };
+
+    // Handle countdown messages (won't receive as host, but set for consistency)
+    _lanComm!.onCountdownReceived = (value) {
+      countdownValue = value;
+      isCountingDown = value > 0;
+      notifyListeners();
+    };
+
+    // Handle team chat for host
+    _lanComm!.onTeamChatReceived = (team, senderId, senderName, message) {
+      final chatMsg = ChatMessage(
+        senderId: senderId,
+        senderName: senderName,
+        text: message,
+        timestamp: DateTime.now(),
+      );
+      teamChatMessages.putIfAbsent(team, () => []).add(chatMsg);
+      notifyListeners();
+    };
+
+    // Handle game start messages (won't receive as host, but set for consistency)
+    _lanComm!.onGameStartReceived = () {
+      // Host starts game locally, doesn't receive this
     };
 
     // Start hosting with privacy settings
@@ -1036,6 +1492,12 @@ class GameManager extends ChangeNotifier {
       Future.microtask(() => notifyListeners());
     };
 
+    // Immediately remove rooms when the host broadcasts a closure
+    _lanComm!.onRoomClosed = (hostId) {
+      _discoveredRooms.removeWhere((r) => r.hostId == hostId);
+      Future.microtask(() => notifyListeners());
+    };
+
     await _lanComm!.startDiscovery();
   }
 
@@ -1058,15 +1520,21 @@ class GameManager extends ChangeNotifier {
     final playerId = 'player_${DateTime.now().millisecondsSinceEpoch}';
     localPlayerId = playerId;
 
-    // Create local player
+    // Create local player (clients start not ready)
     players = [
       Player(
         id: playerId,
         name: playerName,
         role: Role.villager,
         isBot: false,
+        isReady: false, // Clients must explicitly ready up
       )
     ];
+
+    // Clear disconnect state
+    wasDisconnected = false;
+    disconnectReason = null;
+    lobbyChatMessages.clear();
 
     // Set up LAN communication
     if (_lanComm == null) {
@@ -1074,14 +1542,56 @@ class GameManager extends ChangeNotifier {
     }
     _comm = _lanComm;
 
-    _lanComm!.onDisconnectedFromHost = () {
-      // Handle disconnection
+    _lanComm!.onDisconnectedFromHost = (reason) {
+      // Handle disconnection with reason
+      wasDisconnected = true;
+      disconnectReason = reason;
+
+      // Cancel countdown if host disconnects
+      if (isCountingDown) {
+        cancelGameCountdown();
+      }
+
       notifyListeners();
     };
 
     _lanComm!.onJoinRejected = (reason) {
       // Could store the reason for UI
       notifyListeners();
+    };
+
+    // Handle ready state broadcasts from host
+    _lanComm!.onPlayerReadyChanged = (playerId, isReady) {
+      final playerIndex = players.indexWhere((p) => p.id == playerId);
+      if (playerIndex >= 0) {
+        players[playerIndex] = players[playerIndex].copyWith(isReady: isReady);
+        notifyListeners();
+      }
+    };
+
+    // Handle chat broadcasts from host
+    _lanComm!.onChatMessage = (senderId, senderName, message) {
+      final chatMsg = ChatMessage(
+        senderId: senderId,
+        senderName: senderName,
+        text: message,
+        timestamp: DateTime.now(),
+      );
+      lobbyChatMessages.add(chatMsg);
+      notifyListeners();
+    };
+
+    // Handle countdown messages from host (clients only)
+    _lanComm!.onCountdownReceived = (value) {
+      countdownValue = value;
+      isCountingDown = value > 0;
+      notifyListeners();
+    };
+
+    // Handle game start messages from host (clients only)
+    _lanComm!.onGameStartReceived = () {
+      startGame();
+      // Navigation will be handled by lobby screen
     };
 
     // Attach receiver before joining
@@ -1112,26 +1622,74 @@ class GameManager extends ChangeNotifier {
     final playerId = 'player_${DateTime.now().millisecondsSinceEpoch}';
     localPlayerId = playerId;
 
-    // Create local player
+    // Create local player (clients start not ready)
     players = [
       Player(
         id: playerId,
         name: playerName,
         role: Role.villager,
         isBot: false,
+        isReady: false, // Clients must explicitly ready up
       )
     ];
+
+    // Clear disconnect state
+    wasDisconnected = false;
+    disconnectReason = null;
+    lobbyChatMessages.clear();
 
     // Set up LAN communication
     _lanComm = LANCommunication(isHost: false);
     _comm = _lanComm;
 
-    _lanComm!.onDisconnectedFromHost = () {
+    _lanComm!.onDisconnectedFromHost = (reason) {
+      wasDisconnected = true;
+      disconnectReason = reason;
+
+      // Cancel countdown if host disconnects
+      if (isCountingDown) {
+        cancelGameCountdown();
+      }
+
       notifyListeners();
     };
 
     _lanComm!.onJoinRejected = (reason) {
       notifyListeners();
+    };
+
+    // Handle ready state broadcasts from host
+    _lanComm!.onPlayerReadyChanged = (playerId, isReady) {
+      final playerIndex = players.indexWhere((p) => p.id == playerId);
+      if (playerIndex >= 0) {
+        players[playerIndex] = players[playerIndex].copyWith(isReady: isReady);
+        notifyListeners();
+      }
+    };
+
+    // Handle chat broadcasts from host
+    _lanComm!.onChatMessage = (senderId, senderName, message) {
+      final chatMsg = ChatMessage(
+        senderId: senderId,
+        senderName: senderName,
+        text: message,
+        timestamp: DateTime.now(),
+      );
+      lobbyChatMessages.add(chatMsg);
+      notifyListeners();
+    };
+
+    // Handle countdown messages from host (clients only)
+    _lanComm!.onCountdownReceived = (value) {
+      countdownValue = value;
+      isCountingDown = value > 0;
+      notifyListeners();
+    };
+
+    // Handle game start messages from host (clients only)
+    _lanComm!.onGameStartReceived = () {
+      startGame();
+      // Navigation will be handled by lobby screen
     };
 
     attachReceiver(_lanComm!);
@@ -1155,11 +1713,25 @@ class GameManager extends ChangeNotifier {
     return true;
   }
 
+  bool _preserveRoomOnDispose = false;
+
+  /// Preserve the hosted room when the current UI is disposed (useful for host restart -> lobby navigation).
+  void preserveRoomForNextDispose() {
+    _preserveRoomOnDispose = true;
+  }
+
   /// Leave LAN room (client)
   Future<void> leaveLANRoom() async {
     if (_lanComm != null) {
       if (_isHost) {
-        await _lanComm!.stopHosting();
+        if (_preserveRoomOnDispose) {
+          // Consume the flag and keep hosting active (restart flow).
+          _preserveRoomOnDispose = false;
+          notifyListeners();
+          return;
+        } else {
+          await _lanComm!.stopHosting();
+        }
       } else {
         await _lanComm!.leaveRoom();
       }
@@ -1186,6 +1758,273 @@ class GameManager extends ChangeNotifier {
 
   /// Get host IP address (for host only, to show to players)
   String? get hostIp => _lanComm?.currentRoom?.hostIp;
+
+  /// Get host port (for host only, to show to players)
+  int? get hostPort => _lanComm?.currentRoom?.hostPort;
+
+  /// Update room settings (host only)
+  void updateRoomSettings({
+    int? maxPlayers,
+    bool? isPrivate,
+    String? newPin,
+    bool? chatEnabled,
+    bool? moderatorMode,
+    bool? botsEnabled,
+    int? botCount,
+    int? discussionDurationSec,
+    int? votingDurationSec,
+    int? nightDurationSec,
+    bool? hapticsEnabled,
+  }) {
+    if (!_isHost || _lanComm == null) return;
+
+    // Broadcast to clients
+    _lanComm!.updateRoomSettings(
+      maxPlayers: maxPlayers,
+      isPrivate: isPrivate,
+      newPin: newPin,
+      chatEnabled: chatEnabled,
+      moderatorMode: moderatorMode,
+      botsEnabled: botsEnabled,
+      botCount: botCount,
+      discussionDuration: discussionDurationSec,
+      votingDuration: votingDurationSec,
+      nightDuration: nightDurationSec,
+      hapticsEnabled: hapticsEnabled,
+    );
+
+    // Apply bot configuration locally for host
+    if (botsEnabled != null || botCount != null) {
+      final enabled =
+          botsEnabled ?? _lanComm!.currentRoom?.botsEnabled ?? false;
+      final count = botCount ?? _lanComm!.currentRoom?.botCount ?? 0;
+      setRoomBots(enabled: enabled, count: count);
+    }
+
+    // Apply durations/haptics locally for host immediately
+    if (discussionDurationSec != null)
+      setDiscussionDuration(discussionDurationSec);
+    if (votingDurationSec != null) setVotingDuration(votingDurationSec);
+    if (nightDurationSec != null) setNightDuration(nightDurationSec);
+    if (hapticsEnabled != null) setHapticsEnabled(hapticsEnabled);
+
+    notifyListeners();
+  }
+
+  /// Get current room info
+  RoomInfo? get currentRoom => _lanComm?.currentRoom;
+
+  /// Add or remove bots in the lobby (host only)
+  void setRoomBots({required bool enabled, required int count}) {
+    if (!_isHost) return;
+
+    // Remove all bots if disabled
+    if (!enabled) {
+      players.removeWhere((p) => p.isBot);
+      _lanComm?.updateRoomInfo(playerCount: players.length);
+      _broadcastState();
+      notifyListeners();
+      return;
+    }
+
+    // Compute caps based on max players
+    final currentBots = players.where((p) => p.isBot).toList();
+    final humanCount = players.where((p) => !p.isBot).length;
+    final maxPlayers =
+        _lanComm?.currentRoom?.maxPlayers ?? this.gameConfig.playerCount;
+    final maxAllowedBots = maxPlayers - humanCount;
+    final desiredBotCount = count.clamp(0, maxAllowedBots);
+    final delta = desiredBotCount - currentBots.length;
+
+    final rng = Random();
+    final names = [
+      'Alice',
+      'Bob',
+      'Cara',
+      'Dan',
+      'Eve',
+      'Finn',
+      'Gina',
+      'Hank',
+      'Ivy',
+      'Jack',
+      'Luna'
+    ];
+    final personalities = BotPersonality.values;
+
+    if (delta > 0) {
+      for (var i = 0; i < delta; i++) {
+        // Pick base name and ensure unique numbering if duplicate
+        final baseName = names[rng.nextInt(names.length)];
+        final existing =
+            players.where((p) => p.name.startsWith(baseName)).toList();
+        final suffix = existing.isEmpty ? '' : ' #${existing.length + 1}';
+        final name = '$baseName$suffix';
+        final id =
+            'bot_${DateTime.now().millisecondsSinceEpoch}_${rng.nextInt(9999)}';
+        final bot = Player(
+          id: id,
+          name: name,
+          role: Role.villager, // will be reassigned when game starts
+          isBot: true,
+          personality: personalities[rng.nextInt(personalities.length)],
+          isReady: true, // bots are auto-ready in lobby
+        );
+        players.add(bot);
+      }
+    } else if (delta < 0) {
+      var toRemove = -delta;
+      // Remove last added bots
+      for (int i = players.length - 1; i >= 0 && toRemove > 0; i--) {
+        if (players[i].isBot) {
+          players.removeAt(i);
+          toRemove--;
+        }
+      }
+    }
+
+    // Ensure bots are ready
+    players =
+        players.map((p) => p.isBot ? p.copyWith(isReady: true) : p).toList();
+
+    _lanComm?.updateRoomInfo(playerCount: players.length);
+    _broadcastState();
+    notifyListeners();
+
+    // Let bots send a short lobby greeting if chat is enabled
+    if (_lanComm?.currentRoom?.chatEnabled == true) {
+      _bot ??= BotController(this);
+      final newBots = players.where((p) => p.isBot).toList();
+      for (final bot in newBots) {
+        // schedule a brief delayed greeting
+        Future.delayed(Duration(seconds: Random().nextInt(3) + 1), () {
+          _bot?.sendLobbyGreeting(bot);
+        });
+      }
+    }
+  }
+
+  /// Host-side method to send a lobby chat message from a bot
+  void sendLobbyChatMessageFromBot(String botId, String message) {
+    final bot = players
+        .cast<Player?>()
+        .firstWhere((p) => p?.id == botId, orElse: () => null);
+    if (bot == null) return;
+
+    final chatMsg = ChatMessage(
+      senderId: bot.id,
+      senderName: bot.name,
+      text: message,
+      timestamp: DateTime.now(),
+    );
+
+    lobbyChatMessages.add(chatMsg);
+    _lanComm?.broadcastChatMessage(bot.id, bot.name, message);
+    notifyListeners();
+  }
+
+  /// Start game countdown (host only)
+  Future<void> startGameCountdown() async {
+    if (!_isHost || !canStartGame || isCountingDown) return;
+
+    isCountingDown = true;
+    countdownValue = 5;
+
+    // Set countdown flag on room to prevent joins
+    if (_lanComm?.currentRoom != null) {
+      _lanComm!.currentRoom!.isCountingDown = true;
+    }
+
+    notifyListeners();
+
+    // Broadcast countdown start to all clients
+    _lanComm?.broadcastCountdown(countdownValue);
+
+    // Countdown from 5 to 1
+    for (int i = 5; i >= 1; i--) {
+      if (!isCountingDown) {
+        // Countdown was cancelled
+        if (_lanComm?.currentRoom != null) {
+          _lanComm!.currentRoom!.isCountingDown = false;
+        }
+        return;
+      }
+
+      countdownValue = i;
+      notifyListeners();
+      _lanComm?.broadcastCountdown(i);
+
+      await Future.delayed(const Duration(seconds: 1));
+    }
+
+    // Check again before starting (in case host disconnected during countdown)
+    if (!isCountingDown) {
+      if (_lanComm?.currentRoom != null) {
+        _lanComm!.currentRoom!.isCountingDown = false;
+      }
+      return;
+    }
+
+    // Countdown complete - start the game
+    isCountingDown = false;
+    countdownValue = 0;
+    if (_lanComm?.currentRoom != null) {
+      _lanComm!.currentRoom!.isCountingDown = false;
+    }
+    notifyListeners();
+
+    // Broadcast game start to all clients
+    _lanComm?.broadcastGameStart();
+
+    // Start the game
+    startGame();
+
+    // Navigate to role reveal will be handled in lobby screen
+  }
+
+  /// Cancel game countdown (host only, or on host disconnect)
+  void cancelGameCountdown() {
+    if (isCountingDown) {
+      isCountingDown = false;
+      countdownValue = 0;
+      if (_lanComm?.currentRoom != null) {
+        _lanComm!.currentRoom!.isCountingDown = false;
+      }
+      notifyListeners();
+    }
+  }
+
+  /// Send a team/private chat message (e.g., mafia chat)
+  void sendTeamChat(String team, String message) {
+    final sender = localPlayer;
+    if (sender == null) return;
+
+    final chatMsg = ChatMessage(
+      senderId: sender.id,
+      senderName: sender.name,
+      text: message,
+      timestamp: DateTime.now(),
+    );
+
+    // Store locally
+    teamChatMessages.putIfAbsent(team, () => []).add(chatMsg);
+
+    if (_isHost) {
+      // Host broadcasts directly to clients
+      if (_lanComm is LANCommunication) {
+        (_lanComm as LANCommunication)
+            .broadcastTeamChat(team, sender.id, sender.name, message);
+      }
+    } else {
+      // Client sends to host
+      if (_lanComm is LANCommunication) {
+        (_lanComm as LANCommunication)
+            .sendTeamChat(team, message, sender.id, sender.name);
+      }
+    }
+
+    notifyListeners();
+  }
 
   @override
   void dispose() {
